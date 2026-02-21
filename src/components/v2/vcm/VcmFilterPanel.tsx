@@ -1,6 +1,6 @@
 'use client';
 
-import type { VcmVersion, ApplicationFilterItem, DeviceFilterItem } from '@/types/v2';
+import type { VcmVersion, ApplicationFilterItem } from '@/types/v2';
 
 interface VcmFilterPanelProps {
   version: string;
@@ -8,8 +8,6 @@ interface VcmFilterPanelProps {
   versions: VcmVersion[];
   applicationFilters: ApplicationFilterItem[];
   setApplicationFilters: (filters: ApplicationFilterItem[]) => void;
-  deviceFilters: DeviceFilterItem[];
-  setDeviceFilters: (filters: DeviceFilterItem[]) => void;
 }
 
 export default function VcmFilterPanel({
@@ -18,28 +16,20 @@ export default function VcmFilterPanel({
   versions,
   applicationFilters,
   setApplicationFilters,
-  deviceFilters,
-  setDeviceFilters,
 }: VcmFilterPanelProps) {
-  function toggleApplication(index: number) {
-    const updated = applicationFilters.map((item, i) =>
-      i === index ? { ...item, checked: !item.checked } : item
-    );
+  function selectApplication(index: number) {
+    const updated = applicationFilters.map((item, i) => ({
+      ...item,
+      checked: i === index,
+    }));
     setApplicationFilters(updated);
   }
 
-  function toggleDevice(index: number) {
-    const updated = deviceFilters.map((item, i) =>
-      i === index ? { ...item, checked: !item.checked } : item
-    );
-    setDeviceFilters(updated);
-  }
-
   return (
-    <div className="w-64 shrink-0 bg-white border-r border-gray-200 p-4 flex flex-col gap-5 overflow-y-auto">
+    <div className="flex w-56 shrink-0 flex-col gap-5 overflow-y-auto border-r border-gray-200 bg-white p-4">
       {/* VCM Version */}
       <div>
-        <label className="block font-semibold text-sm text-gray-700 mb-1">VCM Version</label>
+        <label className="mb-1 block text-sm font-semibold text-gray-700">VCM Version</label>
         <select
           value={version}
           onChange={(e) => setVersion(e.target.value)}
@@ -53,38 +43,22 @@ export default function VcmFilterPanel({
         </select>
       </div>
 
-      {/* Application */}
+      {/* Application — radio-style single selection */}
       <div>
-        <p className="font-semibold text-sm text-gray-700 mb-2">Application</p>
-        <div className="flex flex-col gap-1.5">
+        <p className="mb-2 text-sm font-semibold text-gray-700">Application</p>
+        <div className="flex flex-col gap-1">
           {applicationFilters.map((item, i) => (
-            <label key={item.type} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={item.checked}
-                onChange={() => toggleApplication(i)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-400"
-              />
-              <span className="text-sm text-gray-700">{item.label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* Devices */}
-      <div>
-        <p className="font-semibold text-sm text-gray-700 mb-2">Devices</p>
-        <div className="flex flex-col gap-1.5">
-          {deviceFilters.map((item, i) => (
-            <label key={item.type} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={item.checked}
-                onChange={() => toggleDevice(i)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-400"
-              />
-              <span className="text-sm text-gray-700">{item.label}</span>
-            </label>
+            <button
+              key={item.type}
+              onClick={() => selectApplication(i)}
+              className={`rounded-lg px-3 py-2 text-left text-sm font-medium transition-all ${
+                item.checked
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
+            >
+              {item.label}
+            </button>
           ))}
         </div>
       </div>

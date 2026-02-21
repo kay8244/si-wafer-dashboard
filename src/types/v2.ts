@@ -117,6 +117,8 @@ export interface VcmData {
   news: VcmNews[];
   newsQueries: Record<ApplicationType, { queryKo: string; queryEn: string }>;
   applicationTable: { application: string; yearly: { year: number; value: number; isEstimate: boolean }[] }[];
+  applicationQuarterlyDemands: Record<ApplicationType, QuarterlyValue[]>;
+  deviceStackedByApp: Record<ApplicationType, DeviceStackedEntry[]>;
 }
 
 // --- 고객별 (Customer Detail) ---
@@ -189,6 +191,23 @@ export interface CustomerExecutive {
   mktInfo?: string;
   newsQueryKo?: string;
   newsQueryEn?: string;
+}
+
+// Quarterly data for bar charts
+export interface QuarterlyValue {
+  quarter: string;
+  value: number;
+  isEstimate: boolean;
+}
+
+export interface DeviceStackedEntry {
+  quarter: string;
+  isEstimate: boolean;
+  dram: number;
+  hbm: number;
+  nand: number;
+  foundry: number;
+  discrete: number;
 }
 
 // --- Filter State ---
