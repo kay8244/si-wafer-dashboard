@@ -1,0 +1,186 @@
+{
+  "lastUpdated": "2026-02-18",
+  "description": "NAND 특화 지표 (추정치). 재무실적은 Yahoo Finance에서 자동 수집됨. 2023년 NAND 다운사이클 → 2024년 AI/SSD 수요 기반 회복 추세 반영.",
+  "customers": {
+    "samsungNand": {
+      "nandMetrics": [
+        {
+          "quarter": "2023 Q1",
+          "asp": 0.080, "aspChangeQoQ": -15.8, "bitShipmentGrowthQoQ": -6.0, "bitShipmentGrowthYoY": -22.0,
+          "capex": 6500000000000, "capexKRW": 6500000000000,
+          "qlcRatio": 25, "inventoryDays": 90, "utilizationRate": 70,
+          "layerStack": { "layer128": 40, "layer176": 25, "layer232": 0, "legacy": 35 }
+        },
+        {
+          "quarter": "2023 Q2",
+          "asp": 0.070, "aspChangeQoQ": -12.5, "bitShipmentGrowthQoQ": -8.0, "bitShipmentGrowthYoY": -28.0,
+          "capex": 5500000000000, "capexKRW": 5500000000000,
+          "qlcRatio": 27, "inventoryDays": 100, "utilizationRate": 65,
+          "layerStack": { "layer128": 38, "layer176": 30, "layer232": 0, "legacy": 32 }
+        },
+        {
+          "quarter": "2023 Q3",
+          "asp": 0.078, "aspChangeQoQ": 11.4, "bitShipmentGrowthQoQ": 4.0, "bitShipmentGrowthYoY": -18.0,
+          "capex": 5800000000000, "capexKRW": 5800000000000,
+          "qlcRatio": 30, "inventoryDays": 85, "utilizationRate": 72,
+          "layerStack": { "layer128": 35, "layer176": 35, "layer232": 5, "legacy": 25 }
+        },
+        {
+          "quarter": "2023 Q4",
+          "asp": 0.092, "aspChangeQoQ": 17.9, "bitShipmentGrowthQoQ": 6.0, "bitShipmentGrowthYoY": -8.0,
+          "capex": 6200000000000, "capexKRW": 6200000000000,
+          "qlcRatio": 33, "inventoryDays": 72, "utilizationRate": 78,
+          "layerStack": { "layer128": 30, "layer176": 38, "layer232": 10, "legacy": 22 }
+        },
+        {
+          "quarter": "2024 Q1",
+          "asp": 0.110, "aspChangeQoQ": 19.6, "bitShipmentGrowthQoQ": 8.0, "bitShipmentGrowthYoY": 15.0,
+          "capex": 7200000000000, "capexKRW": 7200000000000,
+          "qlcRatio": 36, "inventoryDays": 60, "utilizationRate": 83,
+          "layerStack": { "layer128": 22, "layer176": 40, "layer232": 18, "legacy": 20 }
+        },
+        {
+          "quarter": "2024 Q2",
+          "asp": 0.128, "aspChangeQoQ": 16.4, "bitShipmentGrowthQoQ": 6.0, "bitShipmentGrowthYoY": 20.0,
+          "capex": 8000000000000, "capexKRW": 8000000000000,
+          "qlcRatio": 40, "inventoryDays": 52, "utilizationRate": 87,
+          "layerStack": { "layer128": 18, "layer176": 38, "layer232": 25, "legacy": 19 }
+        },
+        {
+          "quarter": "2024 Q3",
+          "asp": 0.142, "aspChangeQoQ": 10.9, "bitShipmentGrowthQoQ": 4.0, "bitShipmentGrowthYoY": 18.0,
+          "capex": 8800000000000, "capexKRW": 8800000000000,
+          "qlcRatio": 43, "inventoryDays": 46, "utilizationRate": 90,
+          "layerStack": { "layer128": 14, "layer176": 35, "layer232": 32, "legacy": 19 }
+        },
+        {
+          "quarter": "2024 Q4",
+          "asp": 0.155, "aspChangeQoQ": 9.2, "bitShipmentGrowthQoQ": 3.0, "bitShipmentGrowthYoY": 15.0,
+          "capex": 9500000000000, "capexKRW": 9500000000000,
+          "qlcRatio": 46, "inventoryDays": 42, "utilizationRate": 92,
+          "layerStack": { "layer128": 10, "layer176": 32, "layer232": 40, "legacy": 18 }
+        }
+      ]
+    },
+    "skHynixNand": {
+      "nandMetrics": [
+        {
+          "quarter": "2023 Q1",
+          "asp": 0.082, "aspChangeQoQ": -14.6, "bitShipmentGrowthQoQ": -5.0, "bitShipmentGrowthYoY": -20.0,
+          "capex": 2800000000000, "capexKRW": 2800000000000,
+          "qlcRatio": 22, "inventoryDays": 88, "utilizationRate": 72,
+          "layerStack": { "layer128": 38, "layer176": 28, "layer232": 0, "legacy": 34 }
+        },
+        {
+          "quarter": "2023 Q2",
+          "asp": 0.072, "aspChangeQoQ": -12.2, "bitShipmentGrowthQoQ": -7.0, "bitShipmentGrowthYoY": -26.0,
+          "capex": 2400000000000, "capexKRW": 2400000000000,
+          "qlcRatio": 24, "inventoryDays": 95, "utilizationRate": 68,
+          "layerStack": { "layer128": 36, "layer176": 32, "layer232": 0, "legacy": 32 }
+        },
+        {
+          "quarter": "2023 Q3",
+          "asp": 0.080, "aspChangeQoQ": 11.1, "bitShipmentGrowthQoQ": 5.0, "bitShipmentGrowthYoY": -15.0,
+          "capex": 2600000000000, "capexKRW": 2600000000000,
+          "qlcRatio": 28, "inventoryDays": 80, "utilizationRate": 74,
+          "layerStack": { "layer128": 32, "layer176": 36, "layer232": 5, "legacy": 27 }
+        },
+        {
+          "quarter": "2023 Q4",
+          "asp": 0.095, "aspChangeQoQ": 18.8, "bitShipmentGrowthQoQ": 7.0, "bitShipmentGrowthYoY": -5.0,
+          "capex": 3000000000000, "capexKRW": 3000000000000,
+          "qlcRatio": 31, "inventoryDays": 68, "utilizationRate": 80,
+          "layerStack": { "layer128": 28, "layer176": 38, "layer232": 12, "legacy": 22 }
+        },
+        {
+          "quarter": "2024 Q1",
+          "asp": 0.115, "aspChangeQoQ": 21.1, "bitShipmentGrowthQoQ": 9.0, "bitShipmentGrowthYoY": 18.0,
+          "capex": 3500000000000, "capexKRW": 3500000000000,
+          "qlcRatio": 35, "inventoryDays": 55, "utilizationRate": 85,
+          "layerStack": { "layer128": 22, "layer176": 40, "layer232": 20, "legacy": 18 }
+        },
+        {
+          "quarter": "2024 Q2",
+          "asp": 0.132, "aspChangeQoQ": 14.8, "bitShipmentGrowthQoQ": 7.0, "bitShipmentGrowthYoY": 22.0,
+          "capex": 3800000000000, "capexKRW": 3800000000000,
+          "qlcRatio": 38, "inventoryDays": 48, "utilizationRate": 88,
+          "layerStack": { "layer128": 18, "layer176": 38, "layer232": 28, "legacy": 16 }
+        },
+        {
+          "quarter": "2024 Q3",
+          "asp": 0.148, "aspChangeQoQ": 12.1, "bitShipmentGrowthQoQ": 5.0, "bitShipmentGrowthYoY": 16.0,
+          "capex": 4200000000000, "capexKRW": 4200000000000,
+          "qlcRatio": 42, "inventoryDays": 42, "utilizationRate": 91,
+          "layerStack": { "layer128": 14, "layer176": 35, "layer232": 35, "legacy": 16 }
+        },
+        {
+          "quarter": "2024 Q4",
+          "asp": 0.160, "aspChangeQoQ": 8.1, "bitShipmentGrowthQoQ": 3.0, "bitShipmentGrowthYoY": 13.0,
+          "capex": 4500000000000, "capexKRW": 4500000000000,
+          "qlcRatio": 45, "inventoryDays": 38, "utilizationRate": 93,
+          "layerStack": { "layer128": 10, "layer176": 30, "layer232": 42, "legacy": 18 }
+        }
+      ]
+    },
+    "westernDigital": {
+      "nandMetrics": [
+        {
+          "quarter": "2023 Q1",
+          "asp": 0.075, "aspChangeQoQ": -18.5, "bitShipmentGrowthQoQ": -4.0, "bitShipmentGrowthYoY": -25.0,
+          "capex": 1200000000, "capexKRW": 1560000000000,
+          "qlcRatio": 20, "inventoryDays": 95, "utilizationRate": 68,
+          "layerStack": { "layer128": 42, "layer176": 22, "layer232": 0, "legacy": 36 }
+        },
+        {
+          "quarter": "2023 Q2",
+          "asp": 0.065, "aspChangeQoQ": -13.3, "bitShipmentGrowthQoQ": -6.0, "bitShipmentGrowthYoY": -30.0,
+          "capex": 1000000000, "capexKRW": 1300000000000,
+          "qlcRatio": 22, "inventoryDays": 105, "utilizationRate": 64,
+          "layerStack": { "layer128": 40, "layer176": 26, "layer232": 0, "legacy": 34 }
+        },
+        {
+          "quarter": "2023 Q3",
+          "asp": 0.074, "aspChangeQoQ": 13.8, "bitShipmentGrowthQoQ": 5.0, "bitShipmentGrowthYoY": -16.0,
+          "capex": 1100000000, "capexKRW": 1430000000000,
+          "qlcRatio": 25, "inventoryDays": 88, "utilizationRate": 70,
+          "layerStack": { "layer128": 36, "layer176": 32, "layer232": 3, "legacy": 29 }
+        },
+        {
+          "quarter": "2023 Q4",
+          "asp": 0.088, "aspChangeQoQ": 18.9, "bitShipmentGrowthQoQ": 6.0, "bitShipmentGrowthYoY": -6.0,
+          "capex": 1300000000, "capexKRW": 1690000000000,
+          "qlcRatio": 28, "inventoryDays": 75, "utilizationRate": 76,
+          "layerStack": { "layer128": 30, "layer176": 36, "layer232": 8, "legacy": 26 }
+        },
+        {
+          "quarter": "2024 Q1",
+          "asp": 0.105, "aspChangeQoQ": 19.3, "bitShipmentGrowthQoQ": 8.0, "bitShipmentGrowthYoY": 16.0,
+          "capex": 1500000000, "capexKRW": 1995000000000,
+          "qlcRatio": 32, "inventoryDays": 62, "utilizationRate": 82,
+          "layerStack": { "layer128": 24, "layer176": 38, "layer232": 16, "legacy": 22 }
+        },
+        {
+          "quarter": "2024 Q2",
+          "asp": 0.122, "aspChangeQoQ": 16.2, "bitShipmentGrowthQoQ": 6.0, "bitShipmentGrowthYoY": 20.0,
+          "capex": 1700000000, "capexKRW": 2295000000000,
+          "qlcRatio": 35, "inventoryDays": 52, "utilizationRate": 86,
+          "layerStack": { "layer128": 20, "layer176": 36, "layer232": 24, "legacy": 20 }
+        },
+        {
+          "quarter": "2024 Q3",
+          "asp": 0.136, "aspChangeQoQ": 11.5, "bitShipmentGrowthQoQ": 4.0, "bitShipmentGrowthYoY": 17.0,
+          "capex": 1900000000, "capexKRW": 2565000000000,
+          "qlcRatio": 38, "inventoryDays": 45, "utilizationRate": 89,
+          "layerStack": { "layer128": 16, "layer176": 34, "layer232": 32, "legacy": 18 }
+        },
+        {
+          "quarter": "2024 Q4",
+          "asp": 0.148, "aspChangeQoQ": 8.8, "bitShipmentGrowthQoQ": 3.0, "bitShipmentGrowthYoY": 14.0,
+          "capex": 2100000000, "capexKRW": 2835000000000,
+          "qlcRatio": 42, "inventoryDays": 40, "utilizationRate": 91,
+          "layerStack": { "layer128": 12, "layer176": 30, "layer232": 40, "legacy": 18 }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,210 @@
+{
+  "lastUpdated": "2026-02-18",
+  "description": "DRAM 특화 지표 (추정치). 재무실적은 Yahoo Finance에서 자동 수집됨. 2023년 DRAM 다운사이클 → 2024년 AI/HBM 수요 기반 회복 추세 반영.",
+  "customers": {
+    "samsungDS": {
+      "dramMetrics": [
+        {
+          "quarter": "2023 Q1",
+          "asp": 0.62, "aspChangeQoQ": -18.4, "bitShipmentGrowthQoQ": -5.0, "bitShipmentGrowthYoY": -25.0,
+          "capex": 7800000000000, "capexKRW": 7800000000000,
+          "hbmRevenue": 200000000000, "hbmRatio": 3,
+          "inventoryDays": 95, "utilizationRate": 72,
+          "techNode": { "node1a": 20, "node1b": 0, "node1g": 0, "legacy": 80 }
+        },
+        {
+          "quarter": "2023 Q2",
+          "asp": 0.55, "aspChangeQoQ": -11.3, "bitShipmentGrowthQoQ": -8.0, "bitShipmentGrowthYoY": -30.0,
+          "capex": 6500000000000, "capexKRW": 6500000000000,
+          "hbmRevenue": 300000000000, "hbmRatio": 4,
+          "inventoryDays": 105, "utilizationRate": 68,
+          "techNode": { "node1a": 22, "node1b": 0, "node1g": 0, "legacy": 78 }
+        },
+        {
+          "quarter": "2023 Q3",
+          "asp": 0.61, "aspChangeQoQ": 10.9, "bitShipmentGrowthQoQ": 3.0, "bitShipmentGrowthYoY": -20.0,
+          "capex": 6200000000000, "capexKRW": 6200000000000,
+          "hbmRevenue": 400000000000, "hbmRatio": 5,
+          "inventoryDays": 90, "utilizationRate": 73,
+          "techNode": { "node1a": 25, "node1b": 5, "node1g": 0, "legacy": 70 }
+        },
+        {
+          "quarter": "2023 Q4",
+          "asp": 0.72, "aspChangeQoQ": 18.0, "bitShipmentGrowthQoQ": 5.0, "bitShipmentGrowthYoY": -10.0,
+          "capex": 7000000000000, "capexKRW": 7000000000000,
+          "hbmRevenue": 600000000000, "hbmRatio": 7,
+          "inventoryDays": 78, "utilizationRate": 78,
+          "techNode": { "node1a": 28, "node1b": 8, "node1g": 0, "legacy": 64 }
+        },
+        {
+          "quarter": "2024 Q1",
+          "asp": 0.88, "aspChangeQoQ": 22.2, "bitShipmentGrowthQoQ": 8.0, "bitShipmentGrowthYoY": 15.0,
+          "capex": 8500000000000, "capexKRW": 8500000000000,
+          "hbmRevenue": 1000000000000, "hbmRatio": 10,
+          "inventoryDays": 65, "utilizationRate": 83,
+          "techNode": { "node1a": 30, "node1b": 12, "node1g": 0, "legacy": 58 }
+        },
+        {
+          "quarter": "2024 Q2",
+          "asp": 1.05, "aspChangeQoQ": 19.3, "bitShipmentGrowthQoQ": 6.0, "bitShipmentGrowthYoY": 20.0,
+          "capex": 9200000000000, "capexKRW": 9200000000000,
+          "hbmRevenue": 1500000000000, "hbmRatio": 12,
+          "inventoryDays": 55, "utilizationRate": 87,
+          "techNode": { "node1a": 30, "node1b": 18, "node1g": 0, "legacy": 52 }
+        },
+        {
+          "quarter": "2024 Q3",
+          "asp": 1.18, "aspChangeQoQ": 12.4, "bitShipmentGrowthQoQ": 4.0, "bitShipmentGrowthYoY": 22.0,
+          "capex": 10500000000000, "capexKRW": 10500000000000,
+          "hbmRevenue": 2200000000000, "hbmRatio": 15,
+          "inventoryDays": 48, "utilizationRate": 90,
+          "techNode": { "node1a": 28, "node1b": 22, "node1g": 2, "legacy": 48 }
+        },
+        {
+          "quarter": "2024 Q4",
+          "asp": 1.30, "aspChangeQoQ": 10.2, "bitShipmentGrowthQoQ": 3.0, "bitShipmentGrowthYoY": 18.0,
+          "capex": 11000000000000, "capexKRW": 11000000000000,
+          "hbmRevenue": 3000000000000, "hbmRatio": 18,
+          "inventoryDays": 45, "utilizationRate": 92,
+          "techNode": { "node1a": 26, "node1b": 26, "node1g": 5, "legacy": 43 }
+        }
+      ]
+    },
+    "skHynix": {
+      "dramMetrics": [
+        {
+          "quarter": "2023 Q1",
+          "asp": 0.65, "aspChangeQoQ": -15.6, "bitShipmentGrowthQoQ": -3.0, "bitShipmentGrowthYoY": -22.0,
+          "capex": 3500000000000, "capexKRW": 3500000000000,
+          "hbmRevenue": 500000000000, "hbmRatio": 8,
+          "inventoryDays": 88, "utilizationRate": 75,
+          "techNode": { "node1a": 25, "node1b": 5, "node1g": 0, "legacy": 70 }
+        },
+        {
+          "quarter": "2023 Q2",
+          "asp": 0.58, "aspChangeQoQ": -10.8, "bitShipmentGrowthQoQ": -6.0, "bitShipmentGrowthYoY": -28.0,
+          "capex": 3000000000000, "capexKRW": 3000000000000,
+          "hbmRevenue": 700000000000, "hbmRatio": 10,
+          "inventoryDays": 98, "utilizationRate": 70,
+          "techNode": { "node1a": 27, "node1b": 8, "node1g": 0, "legacy": 65 }
+        },
+        {
+          "quarter": "2023 Q3",
+          "asp": 0.65, "aspChangeQoQ": 12.1, "bitShipmentGrowthQoQ": 5.0, "bitShipmentGrowthYoY": -15.0,
+          "capex": 3200000000000, "capexKRW": 3200000000000,
+          "hbmRevenue": 1000000000000, "hbmRatio": 13,
+          "inventoryDays": 82, "utilizationRate": 76,
+          "techNode": { "node1a": 28, "node1b": 12, "node1g": 0, "legacy": 60 }
+        },
+        {
+          "quarter": "2023 Q4",
+          "asp": 0.78, "aspChangeQoQ": 20.0, "bitShipmentGrowthQoQ": 7.0, "bitShipmentGrowthYoY": -5.0,
+          "capex": 3800000000000, "capexKRW": 3800000000000,
+          "hbmRevenue": 1500000000000, "hbmRatio": 16,
+          "inventoryDays": 70, "utilizationRate": 82,
+          "techNode": { "node1a": 28, "node1b": 16, "node1g": 0, "legacy": 56 }
+        },
+        {
+          "quarter": "2024 Q1",
+          "asp": 0.95, "aspChangeQoQ": 21.8, "bitShipmentGrowthQoQ": 10.0, "bitShipmentGrowthYoY": 20.0,
+          "capex": 4500000000000, "capexKRW": 4500000000000,
+          "hbmRevenue": 2200000000000, "hbmRatio": 20,
+          "inventoryDays": 58, "utilizationRate": 87,
+          "techNode": { "node1a": 27, "node1b": 22, "node1g": 2, "legacy": 49 }
+        },
+        {
+          "quarter": "2024 Q2",
+          "asp": 1.12, "aspChangeQoQ": 17.9, "bitShipmentGrowthQoQ": 8.0, "bitShipmentGrowthYoY": 25.0,
+          "capex": 5000000000000, "capexKRW": 5000000000000,
+          "hbmRevenue": 3000000000000, "hbmRatio": 23,
+          "inventoryDays": 48, "utilizationRate": 90,
+          "techNode": { "node1a": 25, "node1b": 28, "node1g": 5, "legacy": 42 }
+        },
+        {
+          "quarter": "2024 Q3",
+          "asp": 1.25, "aspChangeQoQ": 11.6, "bitShipmentGrowthQoQ": 5.0, "bitShipmentGrowthYoY": 18.0,
+          "capex": 5500000000000, "capexKRW": 5500000000000,
+          "hbmRevenue": 4000000000000, "hbmRatio": 27,
+          "inventoryDays": 42, "utilizationRate": 93,
+          "techNode": { "node1a": 23, "node1b": 32, "node1g": 8, "legacy": 37 }
+        },
+        {
+          "quarter": "2024 Q4",
+          "asp": 1.38, "aspChangeQoQ": 10.4, "bitShipmentGrowthQoQ": 4.0, "bitShipmentGrowthYoY": 15.0,
+          "capex": 6000000000000, "capexKRW": 6000000000000,
+          "hbmRevenue": 5000000000000, "hbmRatio": 30,
+          "inventoryDays": 38, "utilizationRate": 95,
+          "techNode": { "node1a": 20, "node1b": 35, "node1g": 12, "legacy": 33 }
+        }
+      ]
+    },
+    "micron": {
+      "dramMetrics": [
+        {
+          "quarter": "2023 Q1",
+          "asp": 0.58, "aspChangeQoQ": -20.5, "bitShipmentGrowthQoQ": -4.0, "bitShipmentGrowthYoY": -28.0,
+          "capex": 1800000000, "capexKRW": 2340000000000,
+          "hbmRevenue": 50000000, "hbmRatio": 2,
+          "inventoryDays": 100, "utilizationRate": 70,
+          "techNode": { "node1a": 18, "node1b": 0, "node1g": 0, "legacy": 82 }
+        },
+        {
+          "quarter": "2023 Q2",
+          "asp": 0.50, "aspChangeQoQ": -13.8, "bitShipmentGrowthQoQ": -7.0, "bitShipmentGrowthYoY": -32.0,
+          "capex": 1500000000, "capexKRW": 1950000000000,
+          "hbmRevenue": 80000000, "hbmRatio": 3,
+          "inventoryDays": 115, "utilizationRate": 65,
+          "techNode": { "node1a": 20, "node1b": 3, "node1g": 0, "legacy": 77 }
+        },
+        {
+          "quarter": "2023 Q3",
+          "asp": 0.57, "aspChangeQoQ": 14.0, "bitShipmentGrowthQoQ": 4.0, "bitShipmentGrowthYoY": -18.0,
+          "capex": 1600000000, "capexKRW": 2080000000000,
+          "hbmRevenue": 120000000, "hbmRatio": 4,
+          "inventoryDays": 95, "utilizationRate": 72,
+          "techNode": { "node1a": 22, "node1b": 6, "node1g": 0, "legacy": 72 }
+        },
+        {
+          "quarter": "2023 Q4",
+          "asp": 0.68, "aspChangeQoQ": 19.3, "bitShipmentGrowthQoQ": 6.0, "bitShipmentGrowthYoY": -8.0,
+          "capex": 1800000000, "capexKRW": 2340000000000,
+          "hbmRevenue": 200000000, "hbmRatio": 5,
+          "inventoryDays": 80, "utilizationRate": 78,
+          "techNode": { "node1a": 24, "node1b": 10, "node1g": 0, "legacy": 66 }
+        },
+        {
+          "quarter": "2024 Q1",
+          "asp": 0.82, "aspChangeQoQ": 20.6, "bitShipmentGrowthQoQ": 9.0, "bitShipmentGrowthYoY": 18.0,
+          "capex": 2000000000, "capexKRW": 2660000000000,
+          "hbmRevenue": 350000000, "hbmRatio": 7,
+          "inventoryDays": 68, "utilizationRate": 83,
+          "techNode": { "node1a": 25, "node1b": 15, "node1g": 0, "legacy": 60 }
+        },
+        {
+          "quarter": "2024 Q2",
+          "asp": 0.98, "aspChangeQoQ": 19.5, "bitShipmentGrowthQoQ": 7.0, "bitShipmentGrowthYoY": 22.0,
+          "capex": 2200000000, "capexKRW": 2970000000000,
+          "hbmRevenue": 550000000, "hbmRatio": 9,
+          "inventoryDays": 55, "utilizationRate": 88,
+          "techNode": { "node1a": 24, "node1b": 20, "node1g": 2, "legacy": 54 }
+        },
+        {
+          "quarter": "2024 Q3",
+          "asp": 1.12, "aspChangeQoQ": 14.3, "bitShipmentGrowthQoQ": 5.0, "bitShipmentGrowthYoY": 20.0,
+          "capex": 2500000000, "capexKRW": 3375000000000,
+          "hbmRevenue": 800000000, "hbmRatio": 11,
+          "inventoryDays": 48, "utilizationRate": 91,
+          "techNode": { "node1a": 22, "node1b": 25, "node1g": 5, "legacy": 48 }
+        },
+        {
+          "quarter": "2024 Q4",
+          "asp": 1.22, "aspChangeQoQ": 8.9, "bitShipmentGrowthQoQ": 3.0, "bitShipmentGrowthYoY": 16.0,
+          "capex": 2800000000, "capexKRW": 3780000000000,
+          "hbmRevenue": 1100000000, "hbmRatio": 13,
+          "inventoryDays": 44, "utilizationRate": 93,
+          "techNode": { "node1a": 20, "node1b": 28, "node1g": 8, "legacy": 44 }
+        }
+      ]
+    }
+  }
+}

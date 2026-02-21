@@ -1,0 +1,123 @@
+'use client';
+
+import { useState } from 'react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
+import { FoundryCustomerData, FoundryCustomerId } from '@/types/foundry-customer';
+import { FOUNDRY_CUSTOMERS, FOUNDRY_CUSTOMER_IDS, FoundryMetricKey } from '@/lib/foundry-constants';
+import { formatCurrency } from '@/lib/format';
+
+interface FoundryCapexChartProps {
+  customers: Record<FoundryCustomerId, FoundryCustomerData>;
+  onSelectMetric?: (key: FoundryMetricKey) => void;
+}
+
+type CurrencyMode = 'original' | 'krw';
+
+export default function FoundryCapexChart({ customers, onSelectMetric }: FoundryCapexChartProps) {
+  const [currencyMode, setCurrencyMode] = useState<CurrencyMode>('krw');
+
+  const quarterSet = new Set<string>();
+  FOUNDRY_CUSTOMER_IDS.forEach((id) => {
+    customers[id].foundryMetrics.forEach((m) => quarterSet.add(m.quarter));
+  });
+  const quarters = Array.from(quarterSet).sort().slice(-8);
+
+  const data = quarters.map((quarter) => {
+    const point: Record<string, string | number> = { quarter };
+    FOUNDRY_CUSTOMER_IDS.forEach((id) => {
+      const m = customers[id].foundryMetrics.find((fm) => fm.quarter === quarter);
+      if (currencyMode === 'krw') {
+        point[id] = m ? m.capexKRW : 0;
+      } else {
+        point[id] = m ? m.capex : 0;
+      }
+    });
+    return point;
+  });
+
+  return (
+    <section className="mb-10">
+      <div className="mb-5 flex items-center justify-between">
+        <h2
+          className="cursor-pointer text-lg font-semibold text-slate-800 transition-colors hover:text-blue-600"
+          onClick={() => onSelectMetric?.('capex')}
+        >
+          설비투자(Capex) 비교
+        </h2>
+        <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
+          <button
+            onClick={() => setCurrencyMode('krw')}
+            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+              currencyMode === 'krw'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            원화(KRW)
+          </button>
+          <button
+            onClick={() => setCurrencyMode('original')}
+            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+              currencyMode === 'original'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            현지통화
+          </button>
+        </div>
+      </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-6">
+        <p className="mb-3 text-xs text-slate-400">※ 분기별 설비투자 금액</p>
+        <ResponsiveContainer width="100%" height={450}>
+          <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis dataKey="quarter" tick={{ fontSize: 12 }} tickLine={false} />
+            <YAxis
+              tick={{ fontSize: 12 }}
+              tickLine={false}
+              tickFormatter={(v: number) => {
+                if (currencyMode === 'krw') {
+                  const abs = Math.abs(v);
+                  if (abs >= 1e12) return `${(v / 1e12).toFixed(1)}조`;
+                  if (abs >= 1e8) return `${(v / 1e8).toFixed(0)}억`;
+                  return String(v);
+                }
+                const abs = Math.abs(v);
+                if (abs >= 1e9) return `${(v / 1e9).toFixed(1)}B`;
+                if (abs >= 1e6) return `${(v / 1e6).toFixed(0)}M`;
+                return String(v);
+              }}
+            />
+            <Tooltip
+              formatter={(value, name) => {
+                const companyId = name as FoundryCustomerId;
+                const customer = FOUNDRY_CUSTOMERS[companyId];
+                const currency = currencyMode === 'krw' ? 'KRW' : customer.currency;
+                return [formatCurrency(Number(value), currency), customer.nameKo];
+              }}
+              contentStyle={{ fontSize: 12 }}
+            />
+            <Legend
+              formatter={(value: string) => {
+                const customer = FOUNDRY_CUSTOMERS[value as FoundryCustomerId];
+                return customer?.nameKo || value;
+              }}
+            />
+            {FOUNDRY_CUSTOMER_IDS.map((id) => (
+              <Bar
+                key={id}
+                dataKey={id}
+                fill={FOUNDRY_CUSTOMERS[id].color}
+                radius={[3, 3, 0, 0]}
+                maxBarSize={50}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </section>
+  );
+}
