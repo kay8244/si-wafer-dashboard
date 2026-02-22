@@ -53,9 +53,9 @@ export default function WaferInputChart({ data }: Props) {
       <ResponsiveContainer width="100%" height={160}>
         <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey="quarter" tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 10 }} />
-          <Tooltip contentStyle={{ fontSize: 12 }} />
+          <XAxis dataKey="quarter" tick={{ fontSize: 11 }} />
+          <YAxis tick={{ fontSize: 11 }} />
+          <Tooltip contentStyle={{ fontSize: 13 }} />
           <Line
             type="monotone"
             dataKey="value"

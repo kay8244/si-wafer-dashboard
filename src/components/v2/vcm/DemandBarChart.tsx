@@ -10,6 +10,7 @@ import {
   Cell,
   LabelList,
 } from 'recharts';
+import { useDarkMode } from '@/hooks/useDarkMode';
 
 interface DataPoint {
   quarter: string;
@@ -40,6 +41,12 @@ export default function DemandBarChart({
   data,
   barColor = '#3b82f6',
 }: DemandBarChartProps) {
+  const { isDark } = useDarkMode();
+  const tickFill = isDark ? '#94a3b8' : '#6b7280';
+  const labelFill = isDark ? '#cbd5e1' : '#374151';
+  const tooltipStyle = isDark
+    ? { fontSize: 13, borderRadius: 6, backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' }
+    : { fontSize: 13, borderRadius: 6 };
   return (
     <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white p-4">
       <h3 className="mb-3 text-sm font-semibold text-gray-800">{title}</h3>
@@ -48,13 +55,13 @@ export default function DemandBarChart({
           <BarChart data={data} margin={{ top: 20, right: 8, left: 8, bottom: 4 }}>
             <XAxis
               dataKey="quarter"
-              tick={{ fontSize: 10, fill: '#6b7280' }}
+              tick={{ fontSize: 11, fill: tickFill }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               tickFormatter={formatYAxis}
-              tick={{ fontSize: 10, fill: '#6b7280' }}
+              tick={{ fontSize: 11, fill: tickFill }}
               axisLine={false}
               tickLine={false}
               width={42}
@@ -65,14 +72,14 @@ export default function DemandBarChart({
                 'Value',
               ]}
               labelFormatter={(label) => label}
-              contentStyle={{ fontSize: 12, borderRadius: 6 }}
+              contentStyle={tooltipStyle}
             />
             <Bar dataKey="value" radius={[3, 3, 0, 0]}>
               <LabelList
                 dataKey="value"
                 position="top"
                 formatter={(v: unknown) => formatBarLabel(Number(v))}
-                style={{ fontSize: 9, fill: '#374151', fontWeight: 600 }}
+                style={{ fontSize: 11, fill: labelFill, fontWeight: 600 }}
               />
               {data.map((entry, index) => (
                 <Cell

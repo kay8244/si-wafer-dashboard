@@ -27,7 +27,7 @@ export default function ProductMixChart({ data }: Props) {
           </Pie>
           <Tooltip
             formatter={(value: number | undefined) => [value != null ? `${value}%` : '-', '']}
-            contentStyle={{ fontSize: 12 }}
+            contentStyle={{ fontSize: 13 }}
           />
         </PieChart>
       </ResponsiveContainer>

@@ -21,9 +21,9 @@ export default function GrowthIndicator({ value, label }: GrowthIndicatorProps) 
 
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${bgColor}`}>
-      <span className="text-[10px]">{arrow}</span>
+      <span className="text-[11px]">{arrow}</span>
       {formatPercent(value)}
-      <span className="text-[10px] opacity-70">{label}</span>
+      <span className="text-[11px] opacity-70">{label}</span>
     </span>
   );
 }

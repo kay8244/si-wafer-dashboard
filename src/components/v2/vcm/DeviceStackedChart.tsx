@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { DeviceStackedEntry } from '@/types/v2';
+import { useDarkMode } from '@/hooks/useDarkMode';
 
 interface DeviceStackedChartProps {
   title: string;
@@ -38,6 +39,11 @@ function formatYAxis(value: number): string {
 }
 
 export default function DeviceStackedChart({ title, data }: DeviceStackedChartProps) {
+  const { isDark } = useDarkMode();
+  const tickFill = isDark ? '#94a3b8' : '#6b7280';
+  const tooltipStyle = isDark
+    ? { fontSize: 13, borderRadius: 6, backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' }
+    : { fontSize: 13, borderRadius: 6 };
   const deviceKeys = ['dram', 'hbm', 'nand', 'foundry', 'discrete'] as const;
 
   // Filter out device types that are all zeros
@@ -53,13 +59,13 @@ export default function DeviceStackedChart({ title, data }: DeviceStackedChartPr
           <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 4 }}>
             <XAxis
               dataKey="quarter"
-              tick={{ fontSize: 10, fill: '#6b7280' }}
+              tick={{ fontSize: 11, fill: tickFill }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               tickFormatter={formatYAxis}
-              tick={{ fontSize: 10, fill: '#6b7280' }}
+              tick={{ fontSize: 11, fill: tickFill }}
               axisLine={false}
               tickLine={false}
               width={42}
@@ -69,10 +75,10 @@ export default function DeviceStackedChart({ title, data }: DeviceStackedChartPr
                 `${Number(value).toLocaleString()} Kwsm`,
                 DEVICE_LABELS[name ?? ''] ?? name,
               ]}
-              contentStyle={{ fontSize: 12, borderRadius: 6 }}
+              contentStyle={tooltipStyle}
             />
             <Legend
-              wrapperStyle={{ fontSize: 11 }}
+              wrapperStyle={{ fontSize: 12 }}
               formatter={(value: string) => DEVICE_LABELS[value] ?? value}
             />
             {activeKeys.map((key) => (

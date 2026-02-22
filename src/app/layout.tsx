@@ -13,8 +13,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
-      <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
+    <html lang="ko" suppressHydrationWarning>
+      <body className="min-h-screen bg-gray-50 text-gray-900 antialiased transition-colors duration-200">
         {children}
       </body>
     </html>

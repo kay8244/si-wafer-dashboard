@@ -31,7 +31,7 @@ function renderSummaryWithRefs(
             target="_blank"
             rel="noopener noreferrer"
             title={article.title}
-            className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white no-underline hover:opacity-80"
+            className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[11px] font-bold text-white no-underline hover:opacity-80"
             style={{ backgroundColor: color }}
           >
             {match[1]}
@@ -97,7 +97,7 @@ export default function VcmNewsPanel({
               className="group flex items-start gap-3 rounded-lg border bg-white p-3 transition-all hover:shadow-md"
             >
               <span
-                className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
                 style={{ backgroundColor: accentColor }}
               >
                 {i + 1}
@@ -106,7 +106,7 @@ export default function VcmNewsPanel({
                 <h4 className="mb-1 text-xs font-semibold text-gray-900 group-hover:text-blue-600">
                   {article.title}
                 </h4>
-                <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                <div className="flex items-center gap-2 text-[11px] text-gray-400">
                   <span>{article.source}</span>
                   {article.publishedDate && (
                     <span>{new Date(article.publishedDate).toLocaleDateString('ko-KR')}</span>
@@ -132,14 +132,14 @@ export default function VcmNewsPanel({
               className="flex items-start gap-3 rounded-lg border bg-white p-3"
             >
               <span
-                className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
                 style={{ backgroundColor: accentColor }}
               >
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
                 <h4 className="mb-1 text-xs font-semibold text-gray-900">{item.title}</h4>
-                <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                <div className="flex items-center gap-2 text-[11px] text-gray-400">
                   <span>{item.source}</span>
                   <span>{item.date}</span>
                 </div>

@@ -1,39 +1,8 @@
 'use client';
 
-import { ReactNode } from 'react';
 import { CompanyId } from '@/types/company';
-import { useCompanyNews, NewsArticle } from '@/hooks/useCompanyNews';
-
-function renderSummaryWithRefs(
-  text: string,
-  articles: NewsArticle[],
-  color: string,
-): ReactNode[] {
-  const parts = text.split(/(\[\d+\])/g);
-  return parts.map((part, i) => {
-    const match = part.match(/^\[(\d+)\]$/);
-    if (match) {
-      const idx = parseInt(match[1], 10) - 1;
-      const article = articles[idx];
-      if (article) {
-        return (
-          <a
-            key={i}
-            href={article.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={article.title}
-            className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white no-underline hover:opacity-80"
-            style={{ backgroundColor: color }}
-          >
-            {match[1]}
-          </a>
-        );
-      }
-    }
-    return <span key={i}>{part}</span>;
-  });
-}
+import { useCompanyNews } from '@/hooks/useCompanyNews';
+import { renderSummaryWithRefs } from '@/lib/chart-utils';
 
 interface CompanyNewsProps {
   companyId: CompanyId;
@@ -132,7 +101,7 @@ export default function CompanyNews({
                 className="group flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 transition-all hover:shadow-md"
               >
                 <span
-                  className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                  className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
                   style={{ backgroundColor: companyColor }}
                 >
                   {i + 1}

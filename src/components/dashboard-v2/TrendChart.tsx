@@ -11,37 +11,15 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { CompanyFinancialData, CompanyId, QuarterlyFinancial } from '@/types/company';
+import { CompanyFinancialData, CompanyId } from '@/types/company';
 import { MetricKey, GrowthChartDataPoint } from '@/types/dashboard';
 import { COMPANIES, COMPANY_IDS, METRIC_LABELS } from '@/lib/constants';
 import { formatPercent } from '@/lib/format';
+import { calcYoYGrowth, FinancialMetricKey } from '@/lib/chart-utils';
 
 interface TrendChartProps {
   companies: Record<CompanyId, CompanyFinancialData>;
   metric: MetricKey;
-}
-
-function calcYoYGrowth(
-  quarterlies: QuarterlyFinancial[],
-  metric: MetricKey
-): Map<string, number | null> {
-  const map = new Map<string, number | null>();
-
-  quarterlies.forEach((q) => {
-    const prevYear = quarterlies.find(
-      (pq) =>
-        pq.period === q.period &&
-        pq.calendarYear === String(Number(q.calendarYear) - 1)
-    );
-    if (prevYear && prevYear[metric] !== 0) {
-      const growth = ((q[metric] - prevYear[metric]) / Math.abs(prevYear[metric])) * 100;
-      map.set(q.quarter, growth);
-    } else {
-      map.set(q.quarter, null);
-    }
-  });
-
-  return map;
 }
 
 function buildGrowthData(
@@ -50,7 +28,7 @@ function buildGrowthData(
 ): GrowthChartDataPoint[] {
   const growthMaps: Record<string, Map<string, number | null>> = {};
   COMPANY_IDS.forEach((id) => {
-    growthMaps[id] = calcYoYGrowth(companies[id].quarterlies, metric);
+    growthMaps[id] = calcYoYGrowth(companies[id].quarterlies, metric as FinancialMetricKey);
   });
 
   const quarterSet = new Set<string>();
@@ -81,9 +59,9 @@ export default function TrendChart({ companies, metric }: TrendChartProps) {
         <ResponsiveContainer width="100%" height={400}>
           <LineChart data={data} margin={{ top: 20, right: 30, left: 30, bottom: 10 }}>
             <CartesianGrid stroke="#e2e8f0" />
-            <XAxis dataKey="quarter" tick={{ fontSize: 12 }} tickLine={false} />
+            <XAxis dataKey="quarter" tick={{ fontSize: 13 }} tickLine={false} />
             <YAxis
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 13 }}
               tickLine={false}
               tickFormatter={(v: number) => `${v}%`}
             />

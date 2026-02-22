@@ -1,4 +1,4 @@
-import type { CustomerExecutive, CustomerDetailId } from '@/types/v2';
+import type { CustomerExecutive, CustomerDetailId, MonthlyMetricData, ConfigurableKpi, NewsCategory } from '@/types/v2';
 
 export const CUSTOMER_LIST: { id: CustomerDetailId; label: string; type: 'memory' | 'foundry' }[] = [
   { id: 'SEC', label: 'SEC (삼성)', type: 'memory' },
@@ -29,6 +29,66 @@ function genWaferInput(base: number) {
   });
 }
 
+// Generate 12 months of metric data
+function genMonthlyMetrics(baseInput: number, basePurchase: number, baseInventory: number, baseUtil: number, baseInvLevel: number): MonthlyMetricData[] {
+  const months: MonthlyMetricData[] = [];
+  for (let i = 0; i < 12; i++) {
+    const monthNum = ((i + 2) % 12) + 1; // Feb 2025 to Jan 2026
+    const year = i < 11 ? 25 : 26;
+    const month = `${year}.${String(monthNum).padStart(2, '0')}`;
+    const seasonFactor = 1 + 0.05 * Math.sin((i / 12) * Math.PI * 2);
+    const growthFactor = 1 + i * 0.008;
+    months.push({
+      month,
+      waferInput: +(baseInput * seasonFactor * growthFactor + (seededValue(i * 7 + baseInput) - 0.5) * baseInput * 0.08).toFixed(1),
+      purchaseVolume: +(basePurchase * seasonFactor * growthFactor + (seededValue(i * 11 + basePurchase) - 0.5) * basePurchase * 0.1).toFixed(1),
+      inventoryMonths: +(baseInventory + (seededValue(i * 13 + baseInventory * 10) - 0.5) * 0.8).toFixed(1),
+      utilization: +(baseUtil + (seededValue(i * 17 + baseUtil) - 0.5) * 5 + i * 0.3).toFixed(1),
+      inventoryLevel: +(baseInvLevel + (seededValue(i * 19 + baseInvLevel) - 0.5) * 8).toFixed(1),
+    });
+  }
+  return months;
+}
+
+function genConfigurableKpis(
+  productMixPct: string,
+  inventoryLevel: string,
+  utilization: string,
+  openOrders: string,
+  siliconResource: string,
+): ConfigurableKpi[] {
+  return [
+    { id: 'productMix', label: 'Product Mix (DDR5)', value: productMixPct, unit: '%', trend: 'up', trendValue: '+2.1%' },
+    { id: 'inventoryLevel', label: '재고수준', value: inventoryLevel, unit: '%', trend: 'down', trendValue: '-3.2%' },
+    { id: 'utilization', label: '가동률', value: utilization, unit: '%', trend: 'up', trendValue: '+1.5%' },
+    { id: 'openOrders', label: '개방선인 수', value: openOrders, unit: '건', trend: 'flat', trendValue: '0.0%' },
+    { id: 'siliconResource', label: 'Silicon 자원', value: siliconResource, unit: '%', trend: 'up', trendValue: '+0.8%' },
+    { id: 'waferInput', label: '투입량', value: '45.2', unit: 'Km²', trend: 'up', trendValue: '+3.1%' },
+    { id: 'purchaseVolume', label: '구매량', value: '38.5', unit: 'Km²', trend: 'up', trendValue: '+2.4%' },
+  ];
+}
+
+const NEWS_CATEGORIES: Record<string, NewsCategory[]> = {
+  // SEC news
+  'SEC_0': ['가동률', '투입/구매량'],
+  'SEC_1': ['Product Mix', '투입/구매량'],
+  'SEC_2': ['투입량', '재고수준'],
+  // SKHynix news
+  'SKH_0': ['Product Mix', '투입/구매량'],
+  'SKH_1': ['투입량', '재고수준'],
+  'SKH_2': ['가동률', '투입/구매량'],
+  // Micron news
+  'MIC_0': ['Product Mix', '가동률'],
+  'MIC_1': ['투입량', '재고수준'],
+  // Foundry news
+  'SECF_0': ['가동률', 'Product Mix'],
+  'SECF_1': ['가동률', '투입/구매량'],
+  'TSMC_0': ['투입/구매량', '재고수준'],
+  'TSMC_1': ['가동률', 'Product Mix'],
+  'SMC_0': ['투입/구매량', '재고수준'],
+  'GFS_0': ['투입/구매량', '가동률'],
+};
+
 export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = {
   SEC: {
     customerId: 'SEC',
@@ -37,24 +97,24 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     newsQueryKo: '삼성전자 반도체 메모리 DRAM',
     newsQueryEn: 'Samsung semiconductor memory DRAM',
     productMix: [
-      { category: 'DDR5', percentage: 42, color: '#3B82F6' },
-      { category: 'DDR4', percentage: 25, color: '#10B981' },
-      { category: 'LPDDR5', percentage: 18, color: '#F59E0B' },
-      { category: 'HBM3E', percentage: 10, color: '#EF4444' },
-      { category: 'Others', percentage: 5, color: '#8B5CF6' },
+      { category: 'Mobile', percentage: 22, color: '#3B82F6' },
+      { category: 'PC', percentage: 29, color: '#10B981' },
+      { category: '서버', percentage: 49, color: '#F59E0B' },
     ],
     kpiMetrics: [
       { label: '개방선인 수', value: '4.2', unit: '건' },
       { label: 'Silicon 자원', value: '87', unit: '%' },
       { label: '공폐율', value: '2.3', unit: '%' },
     ],
+    configurableKpis: genConfigurableKpis('49', '78', '91', '4.2', '87'),
     productMixTrend: [
-      { quarter: 'Q1 24', values: { DDR5: 35, DDR4: 30, LPDDR5: 20, HBM3E: 8, Others: 7 } },
-      { quarter: 'Q2 24', values: { DDR5: 38, DDR4: 28, LPDDR5: 19, HBM3E: 9, Others: 6 } },
-      { quarter: 'Q3 24', values: { DDR5: 40, DDR4: 26, LPDDR5: 18, HBM3E: 10, Others: 6 } },
-      { quarter: 'Q4 24', values: { DDR5: 42, DDR4: 25, LPDDR5: 18, HBM3E: 10, Others: 5 } },
+      { quarter: 'Q1 24', values: { Mobile: 25, PC: 32, '서버': 43 } },
+      { quarter: 'Q2 24', values: { Mobile: 24, PC: 30, '서버': 46 } },
+      { quarter: 'Q3 24', values: { Mobile: 23, PC: 30, '서버': 47 } },
+      { quarter: 'Q4 24', values: { Mobile: 22, PC: 29, '서버': 49 } },
     ],
     waferInput: genWaferInput(45),
+    monthlyMetrics: genMonthlyMetrics(45, 38, 2.1, 91, 78),
     scrapRate: [
       { label: '내부 공폐', internal: 2.1, external: 1.8 },
       { label: '기관 공폐', internal: 0.3, external: 0.5 },
@@ -64,9 +124,9 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { source: 'TrendForce', waferBitOut: '12.1B GB', bitGrowth: '+7.8%', gap: '6.5%' },
     ],
     news: [
-      { source: 'Gartner', date: '1/6', title: '2025 AI 서버 시장 성장 조정치 발표, SEC 수혜 전망' },
-      { source: 'Digitimes', date: '1/20', title: 'SEC HBM4 Qual 단일 사이트 대량생산 준비 중' },
-      { source: 'TrendForce', date: '1/15', title: '삼성전자 1Q25 DRAM 출하 +5% 전망' },
+      { source: 'Gartner', date: '1/6', title: '2025 AI 서버 시장 성장 조정치 발표, SEC 수혜 전망', categories: NEWS_CATEGORIES['SEC_0'] },
+      { source: 'Digitimes', date: '1/20', title: 'SEC HBM4 Qual 단일 사이트 대량생산 준비 중', categories: NEWS_CATEGORIES['SEC_1'] },
+      { source: 'TrendForce', date: '1/15', title: '삼성전자 1Q25 DRAM 출하 +5% 전망', categories: NEWS_CATEGORIES['SEC_2'] },
     ],
     weeklySummary: {
       weekLabel: 'Week 4, Jan 2026',
@@ -80,24 +140,24 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     newsQueryKo: 'SK하이닉스 반도체 HBM DRAM',
     newsQueryEn: 'SK Hynix semiconductor HBM DRAM',
     productMix: [
-      { category: 'DDR5', percentage: 38, color: '#3B82F6' },
-      { category: 'DDR4', percentage: 20, color: '#10B981' },
-      { category: 'LPDDR5', percentage: 15, color: '#F59E0B' },
-      { category: 'HBM3E', percentage: 22, color: '#EF4444' },
-      { category: 'Others', percentage: 5, color: '#8B5CF6' },
+      { category: 'Mobile', percentage: 18, color: '#3B82F6' },
+      { category: 'PC', percentage: 25, color: '#10B981' },
+      { category: '서버', percentage: 57, color: '#F59E0B' },
     ],
     kpiMetrics: [
       { label: '개방선인 수', value: '3.8', unit: '건' },
       { label: 'Silicon 자원', value: '92', unit: '%' },
       { label: '공폐율', value: '1.8', unit: '%' },
     ],
+    configurableKpis: genConfigurableKpis('57', '72', '94', '3.8', '92'),
     productMixTrend: [
-      { quarter: 'Q1 24', values: { DDR5: 30, DDR4: 28, LPDDR5: 18, HBM3E: 18, Others: 6 } },
-      { quarter: 'Q2 24', values: { DDR5: 33, DDR4: 25, LPDDR5: 17, HBM3E: 19, Others: 6 } },
-      { quarter: 'Q3 24', values: { DDR5: 35, DDR4: 22, LPDDR5: 16, HBM3E: 21, Others: 6 } },
-      { quarter: 'Q4 24', values: { DDR5: 38, DDR4: 20, LPDDR5: 15, HBM3E: 22, Others: 5 } },
+      { quarter: 'Q1 24', values: { Mobile: 22, PC: 28, '서버': 50 } },
+      { quarter: 'Q2 24', values: { Mobile: 20, PC: 27, '서버': 53 } },
+      { quarter: 'Q3 24', values: { Mobile: 19, PC: 26, '서버': 55 } },
+      { quarter: 'Q4 24', values: { Mobile: 18, PC: 25, '서버': 57 } },
     ],
     waferInput: genWaferInput(52),
+    monthlyMetrics: genMonthlyMetrics(52, 44, 1.8, 94, 72),
     scrapRate: [
       { label: '내부 공폐', internal: 1.5, external: 1.4 },
       { label: '기관 공폐', internal: 0.2, external: 0.4 },
@@ -107,9 +167,9 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { source: 'TrendForce', waferBitOut: '13.8B GB', bitGrowth: '+11.8%', gap: '5.0%' },
     ],
     news: [
-      { source: 'Digitimes', date: '1/20', title: 'SK하이닉스 HBM4 Qual 4분기 완료 전망' },
-      { source: 'TrendForce', date: '1/15', title: 'SK하이닉스 1Q25 HBM 출하 +15% 전망' },
-      { source: 'Reuters', date: '1/22', title: 'SK하이닉스 M15X 신공장 착공, 2026년 양산 목표' },
+      { source: 'Digitimes', date: '1/20', title: 'SK하이닉스 HBM4 Qual 4분기 완료 전망', categories: NEWS_CATEGORIES['SKH_0'] },
+      { source: 'TrendForce', date: '1/15', title: 'SK하이닉스 1Q25 HBM 출하 +15% 전망', categories: NEWS_CATEGORIES['SKH_1'] },
+      { source: 'Reuters', date: '1/22', title: 'SK하이닉스 M15X 신공장 착공, 2026년 양산 목표', categories: NEWS_CATEGORIES['SKH_2'] },
     ],
     weeklySummary: {
       weekLabel: 'Week 4, Jan 2026',
@@ -123,24 +183,24 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     newsQueryKo: '마이크론 반도체 메모리',
     newsQueryEn: 'Micron semiconductor memory',
     productMix: [
-      { category: 'DDR5', percentage: 40, color: '#3B82F6' },
-      { category: 'DDR4', percentage: 22, color: '#10B981' },
-      { category: 'LPDDR5', percentage: 20, color: '#F59E0B' },
-      { category: 'HBM3E', percentage: 12, color: '#EF4444' },
-      { category: 'Others', percentage: 6, color: '#8B5CF6' },
+      { category: 'Mobile', percentage: 28, color: '#3B82F6' },
+      { category: 'PC', percentage: 32, color: '#10B981' },
+      { category: '서버', percentage: 40, color: '#F59E0B' },
     ],
     kpiMetrics: [
       { label: '개방선인 수', value: '3.5', unit: '건' },
       { label: 'Silicon 자원', value: '85', unit: '%' },
       { label: '공폐율', value: '2.8', unit: '%' },
     ],
+    configurableKpis: genConfigurableKpis('40', '82', '88', '3.5', '85'),
     productMixTrend: [
-      { quarter: 'Q1 24', values: { DDR5: 32, DDR4: 30, LPDDR5: 22, HBM3E: 8, Others: 8 } },
-      { quarter: 'Q2 24', values: { DDR5: 35, DDR4: 27, LPDDR5: 21, HBM3E: 10, Others: 7 } },
-      { quarter: 'Q3 24', values: { DDR5: 38, DDR4: 24, LPDDR5: 20, HBM3E: 11, Others: 7 } },
-      { quarter: 'Q4 24', values: { DDR5: 40, DDR4: 22, LPDDR5: 20, HBM3E: 12, Others: 6 } },
+      { quarter: 'Q1 24', values: { Mobile: 30, PC: 35, '서버': 35 } },
+      { quarter: 'Q2 24', values: { Mobile: 29, PC: 34, '서버': 37 } },
+      { quarter: 'Q3 24', values: { Mobile: 29, PC: 33, '서버': 38 } },
+      { quarter: 'Q4 24', values: { Mobile: 28, PC: 32, '서버': 40 } },
     ],
     waferInput: genWaferInput(38),
+    monthlyMetrics: genMonthlyMetrics(38, 32, 2.5, 88, 82),
     scrapRate: [
       { label: '내부 공폐', internal: 2.5, external: 2.0 },
       { label: '기관 공폐', internal: 0.4, external: 0.6 },
@@ -150,8 +210,8 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { source: 'TrendForce', waferBitOut: '9.5B GB', bitGrowth: '+5.9%', gap: '7.9%' },
     ],
     news: [
-      { source: 'Bloomberg', date: '1/18', title: 'Micron HBM3E 수율 개선, NVIDIA 향 납품 확대' },
-      { source: 'TrendForce', date: '1/12', title: 'Micron 1Q25 DRAM 출하 +3% 전망, 보수적 가이던스' },
+      { source: 'Bloomberg', date: '1/18', title: 'Micron HBM3E 수율 개선, NVIDIA 향 납품 확대', categories: NEWS_CATEGORIES['MIC_0'] },
+      { source: 'TrendForce', date: '1/12', title: 'Micron 1Q25 DRAM 출하 +3% 전망, 보수적 가이던스', categories: NEWS_CATEGORIES['MIC_1'] },
     ],
     weeklySummary: {
       weekLabel: 'Week 4, Jan 2026',
@@ -165,24 +225,24 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     newsQueryKo: '삼성 파운드리 반도체',
     newsQueryEn: 'Samsung Foundry semiconductor',
     productMix: [
-      { category: '3nm', percentage: 15, color: '#3B82F6' },
-      { category: '5nm', percentage: 25, color: '#10B981' },
-      { category: '7nm', percentage: 20, color: '#F59E0B' },
-      { category: '14nm', percentage: 22, color: '#EF4444' },
-      { category: 'Others', percentage: 18, color: '#8B5CF6' },
+      { category: 'Mobile', percentage: 35, color: '#3B82F6' },
+      { category: 'PC', percentage: 25, color: '#10B981' },
+      { category: '서버', percentage: 40, color: '#F59E0B' },
     ],
     kpiMetrics: [
       { label: '가동률', value: '72', unit: '%' },
       { label: '수율', value: '68', unit: '%' },
       { label: '공폐율', value: '3.2', unit: '%' },
     ],
+    configurableKpis: genConfigurableKpis('40', '65', '72', '2.1', '78'),
     productMixTrend: [
-      { quarter: 'Q1 24', values: { '3nm': 8, '5nm': 22, '7nm': 22, '14nm': 25, Others: 23 } },
-      { quarter: 'Q2 24', values: { '3nm': 10, '5nm': 23, '7nm': 21, '14nm': 24, Others: 22 } },
-      { quarter: 'Q3 24', values: { '3nm': 12, '5nm': 24, '7nm': 21, '14nm': 23, Others: 20 } },
-      { quarter: 'Q4 24', values: { '3nm': 15, '5nm': 25, '7nm': 20, '14nm': 22, Others: 18 } },
+      { quarter: 'Q1 24', values: { Mobile: 38, PC: 27, '서버': 35 } },
+      { quarter: 'Q2 24', values: { Mobile: 37, PC: 26, '서버': 37 } },
+      { quarter: 'Q3 24', values: { Mobile: 36, PC: 26, '서버': 38 } },
+      { quarter: 'Q4 24', values: { Mobile: 35, PC: 25, '서버': 40 } },
     ],
     waferInput: genWaferInput(28),
+    monthlyMetrics: genMonthlyMetrics(28, 24, 1.5, 72, 65),
     scrapRate: [
       { label: '내부 공폐', internal: 2.8, external: 2.2 },
       { label: '기관 공폐', internal: 0.5, external: 0.7 },
@@ -192,8 +252,8 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { source: 'TrendForce', waferBitOut: '-', bitGrowth: '-', gap: '-' },
     ],
     news: [
-      { source: 'Digitimes', date: '1/15', title: '삼성 파운드리 2nm GAA 공정 개발 가속' },
-      { source: 'TheElec', date: '1/20', title: '삼성 파운드리 가동률 회복 중, 1Q25 +5%p 전망' },
+      { source: 'Digitimes', date: '1/15', title: '삼성 파운드리 2nm GAA 공정 개발 가속', categories: NEWS_CATEGORIES['SECF_0'] },
+      { source: 'TheElec', date: '1/20', title: '삼성 파운드리 가동률 회복 중, 1Q25 +5%p 전망', categories: NEWS_CATEGORIES['SECF_1'] },
     ],
     weeklySummary: {
       weekLabel: 'Week 4, Jan 2026',
@@ -209,24 +269,24 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     newsQueryKo: 'TSMC 파운드리 반도체',
     newsQueryEn: 'TSMC foundry semiconductor',
     productMix: [
-      { category: '3nm', percentage: 28, color: '#3B82F6' },
-      { category: '5nm', percentage: 32, color: '#10B981' },
-      { category: '7nm', percentage: 18, color: '#F59E0B' },
-      { category: '16nm', percentage: 12, color: '#EF4444' },
-      { category: 'Others', percentage: 10, color: '#8B5CF6' },
+      { category: 'Mobile', percentage: 45, color: '#3B82F6' },
+      { category: 'PC', percentage: 20, color: '#10B981' },
+      { category: '서버', percentage: 35, color: '#F59E0B' },
     ],
     kpiMetrics: [
       { label: '가동률', value: '95', unit: '%' },
       { label: '수율', value: '92', unit: '%' },
       { label: '공폐율', value: '1.2', unit: '%' },
     ],
+    configurableKpis: genConfigurableKpis('35', '85', '95', '5.1', '94'),
     productMixTrend: [
-      { quarter: 'Q1 24', values: { '3nm': 20, '5nm': 30, '7nm': 20, '16nm': 15, Others: 15 } },
-      { quarter: 'Q2 24', values: { '3nm': 23, '5nm': 31, '7nm': 19, '16nm': 14, Others: 13 } },
-      { quarter: 'Q3 24', values: { '3nm': 25, '5nm': 32, '7nm': 19, '16nm': 13, Others: 11 } },
-      { quarter: 'Q4 24', values: { '3nm': 28, '5nm': 32, '7nm': 18, '16nm': 12, Others: 10 } },
+      { quarter: 'Q1 24', values: { Mobile: 48, PC: 22, '서버': 30 } },
+      { quarter: 'Q2 24', values: { Mobile: 47, PC: 21, '서버': 32 } },
+      { quarter: 'Q3 24', values: { Mobile: 46, PC: 21, '서버': 33 } },
+      { quarter: 'Q4 24', values: { Mobile: 45, PC: 20, '서버': 35 } },
     ],
     waferInput: genWaferInput(85),
+    monthlyMetrics: genMonthlyMetrics(85, 72, 1.2, 95, 85),
     scrapRate: [
       { label: '내부 공폐', internal: 1.0, external: 0.8 },
       { label: '기관 공폐', internal: 0.1, external: 0.3 },
@@ -236,8 +296,8 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { source: 'TrendForce', waferBitOut: '-', bitGrowth: '-', gap: '-' },
     ],
     news: [
-      { source: 'Reuters', date: '1/22', title: 'TSMC 4Q24 매출 $26.3B, 사상 최고 기록' },
-      { source: 'Digitimes', date: '1/18', title: 'TSMC A16 공정 2026 양산 예정, AI칩 수요 대응' },
+      { source: 'Reuters', date: '1/22', title: 'TSMC 4Q24 매출 $26.3B, 사상 최고 기록', categories: NEWS_CATEGORIES['TSMC_0'] },
+      { source: 'Digitimes', date: '1/18', title: 'TSMC A16 공정 2026 양산 예정, AI칩 수요 대응', categories: NEWS_CATEGORIES['TSMC_1'] },
     ],
     weeklySummary: {
       weekLabel: 'Week 4, Jan 2026',
@@ -253,23 +313,24 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     newsQueryKo: 'SMIC 파운드리 반도체',
     newsQueryEn: 'SMIC foundry semiconductor',
     productMix: [
-      { category: '14nm', percentage: 30, color: '#3B82F6' },
-      { category: '28nm', percentage: 35, color: '#10B981' },
-      { category: '40nm', percentage: 20, color: '#F59E0B' },
-      { category: 'Others', percentage: 15, color: '#8B5CF6' },
+      { category: 'Mobile', percentage: 40, color: '#3B82F6' },
+      { category: 'PC', percentage: 30, color: '#10B981' },
+      { category: '서버', percentage: 30, color: '#F59E0B' },
     ],
     kpiMetrics: [
       { label: '가동률', value: '78', unit: '%' },
       { label: '수율', value: '85', unit: '%' },
       { label: '공폐율', value: '2.5', unit: '%' },
     ],
+    configurableKpis: genConfigurableKpis('30', '70', '78', '1.8', '82'),
     productMixTrend: [
-      { quarter: 'Q1 24', values: { '14nm': 25, '28nm': 38, '40nm': 22, Others: 15 } },
-      { quarter: 'Q2 24', values: { '14nm': 27, '28nm': 37, '40nm': 21, Others: 15 } },
-      { quarter: 'Q3 24', values: { '14nm': 28, '28nm': 36, '40nm': 21, Others: 15 } },
-      { quarter: 'Q4 24', values: { '14nm': 30, '28nm': 35, '40nm': 20, Others: 15 } },
+      { quarter: 'Q1 24', values: { Mobile: 42, PC: 32, '서버': 26 } },
+      { quarter: 'Q2 24', values: { Mobile: 41, PC: 31, '서버': 28 } },
+      { quarter: 'Q3 24', values: { Mobile: 41, PC: 31, '서버': 28 } },
+      { quarter: 'Q4 24', values: { Mobile: 40, PC: 30, '서버': 30 } },
     ],
     waferInput: genWaferInput(22),
+    monthlyMetrics: genMonthlyMetrics(22, 18, 2.0, 78, 70),
     scrapRate: [
       { label: '내부 공폐', internal: 2.2, external: 1.8 },
       { label: '기관 공폐', internal: 0.3, external: 0.5 },
@@ -279,7 +340,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { source: 'TrendForce', waferBitOut: '-', bitGrowth: '-', gap: '-' },
     ],
     news: [
-      { source: 'Digitimes', date: '1/10', title: 'SMC 28nm 수요 회복세, 자동차/IoT 수요 증가' },
+      { source: 'Digitimes', date: '1/10', title: 'SMC 28nm 수요 회복세, 자동차/IoT 수요 증가', categories: NEWS_CATEGORIES['SMC_0'] },
     ],
     weeklySummary: {
       weekLabel: 'Week 4, Jan 2026',
@@ -295,23 +356,24 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     newsQueryKo: 'GlobalFoundries 파운드리',
     newsQueryEn: 'GlobalFoundries foundry semiconductor',
     productMix: [
-      { category: '12nm', percentage: 22, color: '#3B82F6' },
-      { category: '22nm', percentage: 28, color: '#10B981' },
-      { category: '40nm', percentage: 25, color: '#F59E0B' },
-      { category: 'Others', percentage: 25, color: '#8B5CF6' },
+      { category: 'Mobile', percentage: 30, color: '#3B82F6' },
+      { category: 'PC', percentage: 35, color: '#10B981' },
+      { category: '서버', percentage: 35, color: '#F59E0B' },
     ],
     kpiMetrics: [
       { label: '가동률', value: '82', unit: '%' },
       { label: '수율', value: '88', unit: '%' },
       { label: '공폐율', value: '2.0', unit: '%' },
     ],
+    configurableKpis: genConfigurableKpis('35', '75', '82', '2.3', '85'),
     productMixTrend: [
-      { quarter: 'Q1 24', values: { '12nm': 18, '22nm': 30, '40nm': 27, Others: 25 } },
-      { quarter: 'Q2 24', values: { '12nm': 19, '22nm': 29, '40nm': 26, Others: 26 } },
-      { quarter: 'Q3 24', values: { '12nm': 20, '22nm': 28, '40nm': 26, Others: 26 } },
-      { quarter: 'Q4 24', values: { '12nm': 22, '22nm': 28, '40nm': 25, Others: 25 } },
+      { quarter: 'Q1 24', values: { Mobile: 32, PC: 36, '서버': 32 } },
+      { quarter: 'Q2 24', values: { Mobile: 31, PC: 36, '서버': 33 } },
+      { quarter: 'Q3 24', values: { Mobile: 31, PC: 35, '서버': 34 } },
+      { quarter: 'Q4 24', values: { Mobile: 30, PC: 35, '서버': 35 } },
     ],
     waferInput: genWaferInput(18),
+    monthlyMetrics: genMonthlyMetrics(18, 15, 1.8, 82, 75),
     scrapRate: [
       { label: '내부 공폐', internal: 1.8, external: 1.5 },
       { label: '기관 공폐', internal: 0.2, external: 0.4 },
@@ -321,7 +383,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { source: 'TrendForce', waferBitOut: '-', bitGrowth: '-', gap: '-' },
     ],
     news: [
-      { source: 'Reuters', date: '1/14', title: 'GlobalFoundries 자동차/산업용 반도체 수주 확대' },
+      { source: 'Reuters', date: '1/14', title: 'GlobalFoundries 자동차/산업용 반도체 수주 확대', categories: NEWS_CATEGORIES['GFS_0'] },
     ],
     weeklySummary: {
       weekLabel: 'Week 4, Jan 2026',

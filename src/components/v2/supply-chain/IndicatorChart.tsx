@@ -11,6 +11,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { SupplyChainCategory, ViewMode } from '@/types/v2';
+import { useDarkMode } from '@/hooks/useDarkMode';
 
 interface OverlayLine {
   name: string;
@@ -79,6 +80,10 @@ export default function IndicatorChart({
   overlayData,
   viewMode = 'actual',
 }: IndicatorChartProps) {
+  const { isDark } = useDarkMode();
+  const gridColor = isDark ? '#334155' : '#e5e7eb';
+  const tickColor = isDark ? '#94a3b8' : undefined;
+  const tooltipBg = isDark ? { fontSize: 13, borderRadius: 8, backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' } : { fontSize: 13, borderRadius: 8 };
   const hasOverlay = overlayData && overlayData.length > 0;
 
   // Determine which indicators to show
@@ -133,12 +138,12 @@ export default function IndicatorChart({
         )}
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={chartData} margin={{ top: 4, right: hasOverlay ? 16 : 16, left: 0, bottom: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+            <XAxis dataKey="month" tick={{ fontSize: 13, fill: tickColor }} />
             {/* Left Y — single viewMode line with tight domain */}
             <YAxis
               yAxisId="left"
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 13, fill: tickColor }}
               width={65}
               domain={leftDomain}
               tickFormatter={formatYValue}
@@ -149,14 +154,14 @@ export default function IndicatorChart({
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 13, fill: tickColor }}
                 width={65}
                 domain={rightDomain}
                 tickFormatter={formatYValue}
                 stroke="#9ca3af"
               />
             )}
-            <Tooltip contentStyle={{ fontSize: 13, borderRadius: 8 }} />
+            <Tooltip contentStyle={tooltipBg} />
             <Legend wrapperStyle={{ fontSize: 13 }} />
             <Line
               yAxisId="left"
@@ -229,12 +234,12 @@ export default function IndicatorChart({
       </p>
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={chartData} margin={{ top: 4, right: hasOverlay ? 16 : 16, left: 0, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+          <XAxis dataKey="month" tick={{ fontSize: 13, fill: tickColor }} />
           {/* Left Y — indicator data */}
           <YAxis
             yAxisId="left"
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 13, fill: tickColor }}
             width={65}
             domain={leftDomain}
             tickFormatter={formatYValue}
@@ -245,14 +250,14 @@ export default function IndicatorChart({
             <YAxis
               yAxisId="right"
               orientation="right"
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 13, fill: tickColor }}
               width={65}
               domain={rightDomain}
               tickFormatter={formatYValue}
               stroke="#9ca3af"
             />
           )}
-          <Tooltip contentStyle={{ fontSize: 13, borderRadius: 8 }} />
+          <Tooltip contentStyle={tooltipBg} />
           <Legend wrapperStyle={{ fontSize: 13 }} />
           {category.indicators.map((ind, idx) => (
             <Line

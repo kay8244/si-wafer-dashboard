@@ -127,6 +127,42 @@ export type MemoryCustomerId = 'SEC' | 'SKHynix' | 'Micron';
 export type FoundryCustomerId = 'SEC_Foundry' | 'TSMC' | 'SMC' | 'GFS';
 export type CustomerDetailId = MemoryCustomerId | FoundryCustomerId;
 
+export type CustomerMetricId =
+  | 'productMix'
+  | 'inventoryLevel'
+  | 'utilization'
+  | 'openOrders'
+  | 'siliconResource'
+  | 'waferInput'
+  | 'purchaseVolume';
+
+export type NewsCategory = 'Product Mix' | '투입량' | '재고수준' | '가동률' | '투입/구매량';
+
+export interface ConfigurableKpi {
+  id: CustomerMetricId;
+  label: string;
+  value: string;
+  unit: string;
+  trend: 'up' | 'down' | 'flat';
+  trendValue: string;
+}
+
+export interface MonthlyMetricData {
+  month: string;
+  waferInput: number;
+  purchaseVolume: number;
+  inventoryMonths: number;
+  utilization: number;
+  inventoryLevel: number;
+}
+
+export interface MonthlyGrowthEntry {
+  month: string;
+  yoy: number;
+  qoq: number;
+  mom: number;
+}
+
 export interface ProductMixItem {
   category: string;
   percentage: number;
@@ -162,6 +198,7 @@ export interface CustomerNews {
   source: string;
   date: string;
   title: string;
+  categories?: NewsCategory[];
 }
 
 export interface ScrapRate {
@@ -181,8 +218,10 @@ export interface CustomerExecutive {
   type: 'memory' | 'foundry';
   productMix: ProductMixItem[];
   kpiMetrics: KpiMetric[];
+  configurableKpis: ConfigurableKpi[];
   productMixTrend: ProductMixTrend[];
   waferInput: WaferInputData[];
+  monthlyMetrics: MonthlyMetricData[];
   scrapRate: ScrapRate[];
   externalComparison: ExternalComparison[];
   news: CustomerNews[];

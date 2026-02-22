@@ -1,35 +1,36 @@
 'use client';
 
-import { CompanyId } from '@/types/company';
-import { useCompanyNews } from '@/hooks/useCompanyNews';
-import { renderSummaryWithRefs } from '@/lib/chart-utils';
+import { renderSummaryWithRefs, NewsArticle } from '@/lib/chart-utils';
 
-interface CompanyNewsProps {
-  companyId: CompanyId;
-  companyName: string;
-  companyColor: string;
+interface GenericNewsPanelProps {
+  title: string;
+  color: string;
+  articles: NewsArticle[];
+  answer: string | null;
+  loading: boolean;
+  error: string | null;
   onClose: () => void;
 }
 
-export default function CompanyNews({
-  companyId,
-  companyName,
-  companyColor,
+export default function GenericNewsPanel({
+  title,
+  color,
+  articles,
+  answer,
+  loading,
+  error,
   onClose,
-}: CompanyNewsProps) {
-  const { articles, answer, loading, error } = useCompanyNews(companyId);
-
+}: GenericNewsPanelProps) {
   return (
     <section className="mb-8">
-      {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div
             className="h-4 w-4 rounded-full"
-            style={{ backgroundColor: companyColor }}
+            style={{ backgroundColor: color }}
           />
           <h2 className="text-lg font-bold text-gray-800">
-            {companyName} 관련 뉴스
+            {title} 관련 뉴스
           </h2>
         </div>
         <button
@@ -40,7 +41,6 @@ export default function CompanyNews({
         </button>
       </div>
 
-      {/* Loading */}
       {loading && (
         <div className="space-y-4">
           <div className="animate-pulse rounded-xl border bg-white p-6">
@@ -60,14 +60,12 @@ export default function CompanyNews({
         </div>
       )}
 
-      {/* Error */}
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm text-red-700">{error}</p>
         </div>
       )}
 
-      {/* Content */}
       {!loading && !error && articles.length === 0 && (
         <div className="rounded-xl border bg-gray-50 p-8 text-center">
           <p className="text-sm text-gray-500">관련 뉴스가 없습니다.</p>
@@ -76,20 +74,18 @@ export default function CompanyNews({
 
       {!loading && !error && articles.length > 0 && (
         <div className="space-y-4">
-          {/* AI Summary */}
           {answer && (
             <div
               className="rounded-xl border-l-4 bg-white p-5 shadow-sm"
-              style={{ borderLeftColor: companyColor }}
+              style={{ borderLeftColor: color }}
             >
               <h3 className="mb-2 text-sm font-bold text-gray-800">AI 요약</h3>
-              <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-line">
-                {renderSummaryWithRefs(answer, articles, companyColor)}
+              <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">
+                {renderSummaryWithRefs(answer, articles, color)}
               </p>
             </div>
           )}
 
-          {/* Article list */}
           {articles.map((article, i) => (
             <a
               key={i}
@@ -100,7 +96,7 @@ export default function CompanyNews({
             >
               <span
                 className="mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-                style={{ backgroundColor: companyColor }}
+                style={{ backgroundColor: color }}
               >
                 {i + 1}
               </span>
