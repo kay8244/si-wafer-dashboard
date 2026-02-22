@@ -38,7 +38,7 @@ export default function CustomerDetailPage() {
       {/* Title */}
       <div>
         <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">고객 별 현황판</h2>
-        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
           대상고객: 메모리 SEC, SKhy, Micron / Foundry SEC, TSMC, SMC, GFS
         </p>
       </div>

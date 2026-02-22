@@ -46,9 +46,9 @@ export default function WeeklySummary({ data, customerId, foundryData, mktInfo }
   }, [comment, customerId]);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+        <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
           {data.weekLabel} - 고객 회의록
         </h3>
         <button
@@ -88,14 +88,14 @@ export default function WeeklySummary({ data, customerId, foundryData, mktInfo }
           autoFocus
         />
       ) : (
-        <p className="flex gap-2 text-xs leading-relaxed text-gray-700 dark:text-gray-300">
+        <p className="flex gap-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
           <span className="mt-0.5 text-gray-400">&#8226;</span>
           <span>{comment}</span>
         </p>
       )}
 
       {lastModified && (
-        <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
+        <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
           마지막 수정: {lastModified}
         </p>
       )}
@@ -103,12 +103,12 @@ export default function WeeklySummary({ data, customerId, foundryData, mktInfo }
       {(foundryData || mktInfo) && (
         <div className="mt-3 flex flex-wrap gap-2">
           {foundryData && (
-            <div className="rounded border border-blue-100 bg-blue-50 px-2 py-1 text-[11px] text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+            <div className="rounded border border-blue-100 bg-blue-50 px-2 py-1 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
               <span className="font-semibold">Foundry: </span>{foundryData}
             </div>
           )}
           {mktInfo && (
-            <div className="rounded border border-green-100 bg-green-50 px-2 py-1 text-[11px] text-green-800 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300">
+            <div className="rounded border border-green-100 bg-green-50 px-2 py-1 text-xs text-green-800 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300">
               <span className="font-semibold">Mkt: </span>{mktInfo}
             </div>
           )}

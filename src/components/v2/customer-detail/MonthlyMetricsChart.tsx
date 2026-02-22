@@ -18,21 +18,21 @@ interface Props {
 
 export default function MonthlyMetricsChart({ data }: Props) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-      <h3 className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-100">
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
+      <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-100">
         Wafer 투입량 변동 Chart
       </h3>
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+          <XAxis dataKey="month" tick={{ fontSize: 13 }} />
           <YAxis
-            tick={{ fontSize: 11 }}
-            label={{ value: 'Km²', angle: -90, position: 'insideLeft', fontSize: 11, offset: 10 }}
+            tick={{ fontSize: 13 }}
+            label={{ value: 'Km²', angle: -90, position: 'insideLeft', fontSize: 13, offset: 10 }}
           />
           <Tooltip
             contentStyle={{
-              fontSize: 12,
+              fontSize: 14,
               backgroundColor: 'rgba(255,255,255,0.95)',
               border: '1px solid #e5e7eb',
               borderRadius: 8,
@@ -41,7 +41,7 @@ export default function MonthlyMetricsChart({ data }: Props) {
               return [value != null ? `${value} Km²` : '-', name ?? ''];
             }}
           />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Legend wrapperStyle={{ fontSize: 14 }} />
           <Line
             type="monotone"
             dataKey="waferInput"

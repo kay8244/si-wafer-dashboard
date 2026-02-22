@@ -74,8 +74,8 @@ export default function SupplyChainPage() {
   return (
     <div className="flex flex-col gap-5">
       {/* Top bar */}
-      <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-5 py-3.5">
-        <h2 className="text-base font-bold text-gray-900">Supply Chain 별 현황판</h2>
+      <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-5 py-3.5 shadow-md">
+        <h2 className="text-lg font-bold text-gray-900">Supply Chain 별 현황판</h2>
 
         <div className="flex items-center gap-5">
           {/* Unit label */}

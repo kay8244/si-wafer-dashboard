@@ -47,9 +47,9 @@ export default function ExecutivePanel({ data }: Props) {
   return (
     <div className="flex flex-col gap-4">
       {/* Executive 현황판 card */}
-      <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Executive 현황판</h3>
+          <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">Executive 현황판</h3>
           {availableToAdd.length > 0 && (
             <div className="relative" ref={dropdownRef}>
               <button
@@ -83,7 +83,7 @@ export default function ExecutivePanel({ data }: Props) {
 
         {/* Product Mix horizontal bars */}
         <div className="mb-4">
-          <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">Product Mix (%)</p>
+          <p className="mb-2 text-sm font-medium text-gray-500 dark:text-gray-400">Product Mix (%)</p>
           <div className="flex items-center gap-3">
             {data.productMix.map((item) => (
               <div key={item.category} className="flex-1 text-center">
@@ -96,7 +96,7 @@ export default function ExecutivePanel({ data }: Props) {
                     style={{ width: `${item.percentage}%`, backgroundColor: item.color }}
                   />
                 </div>
-                <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{item.category}</div>
+                <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{item.category}</div>
               </div>
             ))}
           </div>
@@ -125,7 +125,7 @@ export default function ExecutivePanel({ data }: Props) {
                   {kpi.value}
                   <span className="ml-0.5 text-xs font-normal text-gray-500 dark:text-gray-400">{kpi.unit}</span>
                 </div>
-                <div className="mt-0.5 flex items-center justify-center gap-1 text-[11px]">
+                <div className="mt-0.5 flex items-center justify-center gap-1 text-xs">
                   {trendIcon(kpi.trend)}
                   <span className={
                     kpi.trend === 'up' ? 'text-green-600 dark:text-green-400' :
@@ -135,7 +135,7 @@ export default function ExecutivePanel({ data }: Props) {
                     {kpi.trendValue}
                   </span>
                 </div>
-                <div className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">{kpi.label}</div>
+                <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{kpi.label}</div>
               </div>
             </div>
           ))}

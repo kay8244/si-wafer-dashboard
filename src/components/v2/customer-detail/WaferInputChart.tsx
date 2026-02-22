@@ -31,9 +31,9 @@ export default function WaferInputChart({ data }: Props) {
   }));
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-md">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-800">Wafer 투입량 변동 Chart</h3>
+        <h3 className="text-lg font-bold text-gray-800">Wafer 투입량 변동 Chart</h3>
         <div className="flex gap-1">
           {UNITS.map((u) => (
             <button
@@ -53,8 +53,8 @@ export default function WaferInputChart({ data }: Props) {
       <ResponsiveContainer width="100%" height={160}>
         <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey="quarter" tick={{ fontSize: 11 }} />
-          <YAxis tick={{ fontSize: 11 }} />
+          <XAxis dataKey="quarter" tick={{ fontSize: 13 }} />
+          <YAxis tick={{ fontSize: 13 }} />
           <Tooltip contentStyle={{ fontSize: 13 }} />
           <Line
             type="monotone"

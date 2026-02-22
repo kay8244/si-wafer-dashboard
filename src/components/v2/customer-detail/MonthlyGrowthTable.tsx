@@ -23,7 +23,7 @@ function GrowthCell({ value }: { value: number }) {
   const color = value > 0 ? 'text-green-600 dark:text-green-400' : value < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400';
   const prefix = value > 0 ? '+' : '';
   return (
-    <td className={`px-1.5 py-1 text-right text-[11px] tabular-nums ${color}`}>
+    <td className={`px-1.5 py-1 text-right text-xs tabular-nums ${color}`}>
       {prefix}{value}%
     </td>
   );
@@ -47,21 +47,21 @@ export default function MonthlyGrowthTable({ data }: Props) {
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-      <h3 className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-100">
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
+      <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-100">
         월별 성장률 (QoQ / MoM)
       </h3>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[500px]">
           <thead>
             <tr className="border-b border-gray-200 dark:border-gray-600">
-              <th className="px-2 py-1.5 text-left text-[11px] font-semibold text-gray-600 dark:text-gray-400" rowSpan={2}>
+              <th className="px-2 py-1.5 text-left text-xs font-semibold text-gray-600 dark:text-gray-400" rowSpan={2}>
                 지표
               </th>
               {recentData.map((d) => (
                 <th
                   key={d.month}
-                  className="border-l border-gray-100 px-0.5 py-1 text-center text-[11px] font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-400"
+                  className="border-l border-gray-100 px-0.5 py-1 text-center text-xs font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-400"
                   colSpan={2}
                 >
                   {d.month}
@@ -71,8 +71,8 @@ export default function MonthlyGrowthTable({ data }: Props) {
             <tr className="border-b border-gray-100 dark:border-gray-600">
               {recentData.map((d) => (
                 <Fragment key={d.month}>
-                  <th className="border-l border-gray-100 px-1 py-1 text-center text-[11px] font-medium text-gray-400 dark:border-gray-600">QoQ</th>
-                  <th className="px-1 py-1 text-center text-[11px] font-medium text-gray-400">MoM</th>
+                  <th className="border-l border-gray-100 px-1 py-1 text-center text-xs font-medium text-gray-400 dark:border-gray-600">QoQ</th>
+                  <th className="px-1 py-1 text-center text-xs font-medium text-gray-400">MoM</th>
                 </Fragment>
               ))}
             </tr>
@@ -80,7 +80,7 @@ export default function MonthlyGrowthTable({ data }: Props) {
           <tbody>
             {METRICS.map((metric) => (
               <tr key={metric.key} className="border-b border-gray-50 last:border-0 dark:border-gray-700">
-                <td className="px-2 py-1.5 text-[11px] font-medium text-gray-700 dark:text-gray-300">
+                <td className="px-2 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300">
                   {metric.label}
                 </td>
                 {recentData.map((_, mi) => {

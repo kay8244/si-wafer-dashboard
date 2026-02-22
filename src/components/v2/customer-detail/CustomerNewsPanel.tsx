@@ -74,8 +74,8 @@ export default function CustomerNewsPanel({
   accentColor = '#3b82f6',
 }: CustomerNewsPanelProps) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-      <h3 className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-100">관련 뉴스</h3>
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
+      <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-100">관련 뉴스</h3>
 
       {/* Loading */}
       {loading && (
@@ -108,8 +108,8 @@ export default function CustomerNewsPanel({
               className="rounded-xl border-l-4 bg-white p-4 shadow-sm dark:bg-gray-700/50"
               style={{ borderLeftColor: accentColor }}
             >
-              <h4 className="mb-1.5 text-xs font-bold text-gray-800 dark:text-gray-200">AI 요약</h4>
-              <p className="whitespace-pre-line text-xs leading-relaxed text-gray-700 dark:text-gray-300">
+              <h4 className="mb-1.5 text-sm font-bold text-gray-800 dark:text-gray-200">AI 요약</h4>
+              <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700 dark:text-gray-300">
                 {renderSummaryWithRefs(answer, articles, accentColor)}
               </p>
             </div>
@@ -135,7 +135,7 @@ export default function CustomerNewsPanel({
                   {i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <h4 className="mb-1 text-xs font-semibold text-gray-900 group-hover:text-blue-600 dark:text-gray-100 dark:group-hover:text-blue-400">
+                  <h4 className="mb-1 text-sm font-semibold text-gray-900 group-hover:text-blue-600 dark:text-gray-100 dark:group-hover:text-blue-400">
                     {article.title}
                   </h4>
                   {/* Category tags */}
@@ -144,14 +144,14 @@ export default function CustomerNewsPanel({
                       {cats.map((cat) => (
                         <span
                           key={cat}
-                          className={`inline-block rounded-full px-1.5 py-0.5 text-[11px] font-medium ${CATEGORY_COLORS[cat]}`}
+                          className={`inline-block rounded-full px-1.5 py-0.5 text-xs font-medium ${CATEGORY_COLORS[cat]}`}
                         >
                           {cat}
                         </span>
                       ))}
                     </div>
                   )}
-                  <div className="flex items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500">
+                  <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
                     <span>{article.source}</span>
                     {article.publishedDate && (
                       <span>{new Date(article.publishedDate).toLocaleDateString('ko-KR')}</span>

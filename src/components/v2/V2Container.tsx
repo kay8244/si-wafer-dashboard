@@ -20,14 +20,27 @@ export default function V2Container() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">V2 현황판</h1>
-        <div className="flex items-center gap-3">
-          {/* Dark mode toggle */}
+      {/* Tab Navigation */}
+      <div className="mb-6 flex items-center gap-2">
+        <div className="flex flex-1 gap-1 rounded-xl bg-gray-100 p-1.5">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 rounded-lg px-8 py-4 text-xl font-bold transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex shrink-0 flex-col gap-1.5">
           <button
             onClick={toggle}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-100"
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-100"
             title={isDark ? '라이트 모드' : '다크 모드'}
           >
             {isDark ? (
@@ -42,28 +55,11 @@ export default function V2Container() {
           </button>
           <a
             href="/"
-            className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-200"
+            className="rounded-lg bg-gray-100 px-3 py-2 text-center text-xs font-medium text-gray-600 transition-colors hover:bg-gray-200"
           >
-            V1 대시보드 →
+            경쟁사/고객사 실적
           </a>
         </div>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="mb-6 flex gap-1 rounded-xl bg-gray-100 p-1">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 rounded-lg px-6 py-3 text-sm font-semibold transition-colors ${
-              activeTab === tab.id
-                ? 'bg-white text-blue-700 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
       </div>
 
       {/* Page Content */}

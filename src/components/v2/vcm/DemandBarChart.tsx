@@ -48,20 +48,20 @@ export default function DemandBarChart({
     ? { fontSize: 13, borderRadius: 6, backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' }
     : { fontSize: 13, borderRadius: 6 };
   return (
-    <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white p-4">
-      <h3 className="mb-3 text-sm font-semibold text-gray-800">{title}</h3>
+    <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md">
+      <h3 className="mb-3 text-lg font-bold text-gray-800">{title}</h3>
       <div className="min-h-0 flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 20, right: 8, left: 8, bottom: 4 }}>
             <XAxis
               dataKey="quarter"
-              tick={{ fontSize: 11, fill: tickFill }}
+              tick={{ fontSize: 13, fill: tickFill }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               tickFormatter={formatYAxis}
-              tick={{ fontSize: 11, fill: tickFill }}
+              tick={{ fontSize: 13, fill: tickFill }}
               axisLine={false}
               tickLine={false}
               width={42}
@@ -79,7 +79,7 @@ export default function DemandBarChart({
                 dataKey="value"
                 position="top"
                 formatter={(v: unknown) => formatBarLabel(Number(v))}
-                style={{ fontSize: 11, fill: labelFill, fontWeight: 600 }}
+                style={{ fontSize: 13, fill: labelFill, fontWeight: 600 }}
               />
               {data.map((entry, index) => (
                 <Cell

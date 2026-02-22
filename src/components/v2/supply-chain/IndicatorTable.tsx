@@ -102,8 +102,8 @@ export default function IndicatorTable({
   };
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-      <table className="w-full border-collapse text-sm">
+    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-md">
+      <table className="w-full border-collapse text-base">
         <thead>
           <tr className="border-b-2 border-gray-300 bg-gray-50 text-gray-600">
             <th className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">
@@ -193,7 +193,7 @@ export default function IndicatorTable({
                 <td className="px-3 py-2.5 text-center">
                   {ind.leadingRating ? (
                     <span
-                      className={`inline-block rounded-md px-2.5 py-1 text-xs font-bold ${leadingRatingBadge(ind.leadingRating)}`}
+                      className={`inline-block rounded-md px-2.5 py-1 text-sm font-bold ${leadingRatingBadge(ind.leadingRating)}`}
                     >
                       {ind.leadingRating}
                     </span>
@@ -207,7 +207,7 @@ export default function IndicatorTable({
         </tbody>
       </table>
       {/* Footer legend */}
-      <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-2 text-xs text-gray-500">
+      <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-2 text-sm text-gray-500">
         월별 표시: <span className="font-semibold text-gray-700">{VIEW_MODE_LABELS[viewMode]}</span>
         <span className="ml-3 text-gray-400">| 지표명에 마우스를 올리면 판단을 확인할 수 있습니다</span>
       </div>

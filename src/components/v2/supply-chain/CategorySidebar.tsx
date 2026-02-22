@@ -49,7 +49,7 @@ export default function CategorySidebar({
   return (
     <div className="flex w-56 flex-shrink-0 flex-col gap-1 overflow-y-auto">
       {/* ── Category Section ── */}
-      <p className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-gray-400">
+      <p className="px-1 pb-1 text-sm font-bold uppercase tracking-wider text-gray-400">
         외부 지표
       </p>
       <div className="flex flex-col gap-1.5">
@@ -81,7 +81,7 @@ export default function CategorySidebar({
       <div className="my-3 border-t border-gray-200" />
 
       {/* ── Internal Data Overlay Section ── */}
-      <p className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-gray-400">
+      <p className="px-1 pb-1 text-sm font-bold uppercase tracking-wider text-gray-400">
         내부 데이터 오버레이
       </p>
 

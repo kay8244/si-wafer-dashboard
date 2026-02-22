@@ -53,8 +53,8 @@ export default function VcmNewsPanel({
   const showRealNews = articles !== undefined;
 
   return (
-    <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white p-4">
-      <h3 className="mb-3 text-sm font-semibold text-gray-800">관련 News 및 기사</h3>
+    <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md">
+      <h3 className="mb-3 text-lg font-bold text-gray-800">관련 News 및 기사</h3>
 
       {/* Loading */}
       {loading && (
@@ -81,8 +81,8 @@ export default function VcmNewsPanel({
               className="rounded-xl border-l-4 bg-white p-4 shadow-sm"
               style={{ borderLeftColor: accentColor }}
             >
-              <h4 className="mb-1.5 text-xs font-bold text-gray-800">AI 요약</h4>
-              <p className="whitespace-pre-line text-xs leading-relaxed text-gray-700">
+              <h4 className="mb-1.5 text-sm font-bold text-gray-800">AI 요약</h4>
+              <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">
                 {renderSummaryWithRefs(answer, articles ?? [], accentColor)}
               </p>
             </div>
@@ -103,10 +103,10 @@ export default function VcmNewsPanel({
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
-                <h4 className="mb-1 text-xs font-semibold text-gray-900 group-hover:text-blue-600">
+                <h4 className="mb-1 text-sm font-semibold text-gray-900 group-hover:text-blue-600">
                   {article.title}
                 </h4>
-                <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                <div className="flex items-center gap-2 text-xs text-gray-400">
                   <span>{article.source}</span>
                   {article.publishedDate && (
                     <span>{new Date(article.publishedDate).toLocaleDateString('ko-KR')}</span>
@@ -138,8 +138,8 @@ export default function VcmNewsPanel({
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
-                <h4 className="mb-1 text-xs font-semibold text-gray-900">{item.title}</h4>
-                <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                <h4 className="mb-1 text-sm font-semibold text-gray-900">{item.title}</h4>
+                <div className="flex items-center gap-2 text-xs text-gray-400">
                   <span>{item.source}</span>
                   <span>{item.date}</span>
                 </div>

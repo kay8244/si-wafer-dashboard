@@ -9,6 +9,7 @@ import {
   Legend,
   ResponsiveContainer,
   CartesianGrid,
+  LabelList,
 } from 'recharts';
 import { SupplyChainCategory, ViewMode } from '@/types/v2';
 import { useDarkMode } from '@/hooks/useDarkMode';
@@ -83,7 +84,7 @@ export default function IndicatorChart({
   const { isDark } = useDarkMode();
   const gridColor = isDark ? '#334155' : '#e5e7eb';
   const tickColor = isDark ? '#94a3b8' : undefined;
-  const tooltipBg = isDark ? { fontSize: 13, borderRadius: 8, backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' } : { fontSize: 13, borderRadius: 8 };
+  const tooltipBg = isDark ? { fontSize: 14, borderRadius: 8, backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' } : { fontSize: 14, borderRadius: 8 };
   const hasOverlay = overlayData && overlayData.length > 0;
 
   // Determine which indicators to show
@@ -120,13 +121,13 @@ export default function IndicatorChart({
     const rightDomain = tightDomain(allRightValues);
 
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-5">
+      <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-md">
         {/* Title */}
-        <p className="mb-1 text-sm font-bold text-gray-800">
+        <p className="mb-1 text-lg font-bold text-gray-800">
           {ind.name}
-          <span className="ml-2 text-xs font-normal text-gray-400">({ind.unit}) — {vmLine.label}</span>
+          <span className="ml-2 text-sm font-normal text-gray-400">({ind.unit}) — {vmLine.label}</span>
           {hasOverlay && (
-            <span className="ml-3 text-xs font-normal text-gray-400">| 오른쪽 축: 내부 데이터</span>
+            <span className="ml-3 text-sm font-normal text-gray-400">| 오른쪽 축: 내부 데이터</span>
           )}
         </p>
         {/* Judgment banner */}
@@ -137,13 +138,13 @@ export default function IndicatorChart({
           </div>
         )}
         <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={chartData} margin={{ top: 4, right: hasOverlay ? 16 : 16, left: 0, bottom: 4 }}>
+          <LineChart data={chartData} margin={{ top: 20, right: hasOverlay ? 16 : 16, left: 0, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis dataKey="month" tick={{ fontSize: 13, fill: tickColor }} />
+            <XAxis dataKey="month" tick={{ fontSize: 14, fill: tickColor }} />
             {/* Left Y — single viewMode line with tight domain */}
             <YAxis
               yAxisId="left"
-              tick={{ fontSize: 13, fill: tickColor }}
+              tick={{ fontSize: 14, fill: tickColor }}
               width={65}
               domain={leftDomain}
               tickFormatter={formatYValue}
@@ -154,7 +155,7 @@ export default function IndicatorChart({
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                tick={{ fontSize: 13, fill: tickColor }}
+                tick={{ fontSize: 14, fill: tickColor }}
                 width={65}
                 domain={rightDomain}
                 tickFormatter={formatYValue}
@@ -162,7 +163,7 @@ export default function IndicatorChart({
               />
             )}
             <Tooltip contentStyle={tooltipBg} />
-            <Legend wrapperStyle={{ fontSize: 13 }} />
+            <Legend wrapperStyle={{ fontSize: 14 }} />
             <Line
               yAxisId="left"
               type="monotone"
@@ -170,7 +171,14 @@ export default function IndicatorChart({
               stroke={vmLine.color}
               strokeWidth={2}
               dot={{ r: 3 }}
-            />
+            >
+              <LabelList
+                dataKey={vmLine.label}
+                position="top"
+                formatter={(v: unknown) => formatYValue(Number(v))}
+                style={{ fontSize: 12, fill: vmLine.color, fontWeight: 600 }}
+              />
+            </Line>
             {overlayData?.map((ol) => (
               <Line
                 key={ol.name}
@@ -181,7 +189,14 @@ export default function IndicatorChart({
                 strokeWidth={2}
                 dot={{ r: 3, fill: ol.color }}
                 strokeDasharray="6 3"
-              />
+              >
+                <LabelList
+                  dataKey={ol.name}
+                  position="bottom"
+                  formatter={(v: unknown) => formatYValue(Number(v))}
+                  style={{ fontSize: 10, fill: ol.color, fontWeight: 600 }}
+                />
+              </Line>
             ))}
           </LineChart>
         </ResponsiveContainer>
@@ -217,8 +232,8 @@ export default function IndicatorChart({
   const rightDomain = tightDomain(allRightValues);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
-      <p className="mb-3 text-sm font-bold text-gray-800">
+    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-md">
+      <p className="mb-3 text-lg font-bold text-gray-800">
         All Indicators —{' '}
         {viewMode === 'actual'
           ? 'Actual'
@@ -227,19 +242,19 @@ export default function IndicatorChart({
             : viewMode === 'twelveMonthMA'
               ? '12MMA'
               : viewMode.toUpperCase()}
-        <span className="ml-2 text-xs font-normal text-gray-400">(행을 클릭하면 개별 지표를 볼 수 있습니다)</span>
+        <span className="ml-2 text-sm font-normal text-gray-400">(행을 클릭하면 개별 지표를 볼 수 있습니다)</span>
         {hasOverlay && (
-          <span className="ml-3 text-xs font-normal text-gray-400">| 오른쪽 축: 내부 데이터</span>
+          <span className="ml-3 text-sm font-normal text-gray-400">| 오른쪽 축: 내부 데이터</span>
         )}
       </p>
       <ResponsiveContainer width="100%" height={320}>
-        <LineChart data={chartData} margin={{ top: 4, right: hasOverlay ? 16 : 16, left: 0, bottom: 4 }}>
+        <LineChart data={chartData} margin={{ top: 20, right: hasOverlay ? 16 : 16, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-          <XAxis dataKey="month" tick={{ fontSize: 13, fill: tickColor }} />
+          <XAxis dataKey="month" tick={{ fontSize: 14, fill: tickColor }} />
           {/* Left Y — indicator data */}
           <YAxis
             yAxisId="left"
-            tick={{ fontSize: 13, fill: tickColor }}
+            tick={{ fontSize: 14, fill: tickColor }}
             width={65}
             domain={leftDomain}
             tickFormatter={formatYValue}
@@ -250,7 +265,7 @@ export default function IndicatorChart({
             <YAxis
               yAxisId="right"
               orientation="right"
-              tick={{ fontSize: 13, fill: tickColor }}
+              tick={{ fontSize: 14, fill: tickColor }}
               width={65}
               domain={rightDomain}
               tickFormatter={formatYValue}
@@ -258,7 +273,7 @@ export default function IndicatorChart({
             />
           )}
           <Tooltip contentStyle={tooltipBg} />
-          <Legend wrapperStyle={{ fontSize: 13 }} />
+          <Legend wrapperStyle={{ fontSize: 14 }} />
           {category.indicators.map((ind, idx) => (
             <Line
               key={ind.id}
@@ -267,8 +282,15 @@ export default function IndicatorChart({
               dataKey={ind.name}
               stroke={INDICATOR_COLORS[idx % INDICATOR_COLORS.length]}
               strokeWidth={1.5}
-              dot={false}
-            />
+              dot={{ r: 2 }}
+            >
+              <LabelList
+                dataKey={ind.name}
+                position="top"
+                formatter={(v: unknown) => formatYValue(Number(v))}
+                style={{ fontSize: 10, fill: INDICATOR_COLORS[idx % INDICATOR_COLORS.length], fontWeight: 600 }}
+              />
+            </Line>
           ))}
           {overlayData?.map((ol) => (
             <Line
@@ -280,7 +302,14 @@ export default function IndicatorChart({
               strokeWidth={2}
               dot={{ r: 3, fill: ol.color }}
               strokeDasharray="6 3"
-            />
+            >
+              <LabelList
+                dataKey={ol.name}
+                position="bottom"
+                formatter={(v: unknown) => formatYValue(Number(v))}
+                style={{ fontSize: 10, fill: ol.color, fontWeight: 600 }}
+              />
+            </Line>
           ))}
         </LineChart>
       </ResponsiveContainer>
