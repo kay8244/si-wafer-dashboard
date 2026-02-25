@@ -19,7 +19,7 @@ export type LeadingIndicatorRating = '상' | '중' | '하';
 export interface SupplyChainIndicator {
   id: string;
   name: string;
-  unit: 'K' | 'M' | '%';
+  unit: string;
   monthly: MonthlyData[];
   semiAnnualEval?: SemiAnnualEval;
   judgment?: string;

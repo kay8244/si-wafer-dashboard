@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { SupplyChainCategory, SupplyChainIndicator, ViewMode, LeadingIndicatorRating } from '@/types/v2';
-import { DYNAMIC_MONTHS } from '@/data/v2/supply-chain-mock';
+import { TABLE_MONTHS } from '@/data/v2/supply-chain-mock';
 
 interface IndicatorTableProps {
   category: SupplyChainCategory;
@@ -73,8 +73,8 @@ function pctColorClass(value: number): string {
   return 'text-gray-600';
 }
 
-/** Display short month labels from dynamic months (e.g. '2025-09' → '25.09') */
-const MONTH_LABELS = DYNAMIC_MONTHS.map((m) => {
+/** Display short month labels from table months (last 6, e.g. '2025-09' → '25.09') */
+const MONTH_LABELS = TABLE_MONTHS.map((m) => {
   const [y, mo] = m.split('-');
   return `${y.slice(2)}.${mo}`;
 });
@@ -151,8 +151,8 @@ export default function IndicatorTable({
                   )}
                 </td>
 
-                {/* Monthly values — driven by viewMode */}
-                {ind.monthly.map((m) => {
+                {/* Monthly values — driven by viewMode (last 6 months only) */}
+                {ind.monthly.slice(-6).map((m) => {
                   const raw = getMonthlyRawValue(m, viewMode);
                   const colorClass = isPctMode(viewMode) ? pctColorClass(raw) : 'text-gray-700';
                   return (

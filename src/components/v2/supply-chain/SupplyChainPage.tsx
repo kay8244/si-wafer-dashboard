@@ -18,9 +18,9 @@ const VIEW_MODES: { value: ViewMode; label: string }[] = [
 ];
 
 export default function SupplyChainPage() {
-  const [selectedCategory, setSelectedCategory] = useState<SupplyChainCategoryId>('wafer');
+  const [selectedCategory, setSelectedCategory] = useState<SupplyChainCategoryId>('macro');
   const [selectedIndicatorId, setSelectedIndicatorId] = useState<string | null>(
-    SUPPLY_CHAIN_CATEGORIES.find((c) => c.id === 'wafer')?.indicators[0]?.id ?? null,
+    SUPPLY_CHAIN_CATEGORIES.find((c) => c.id === 'macro')?.indicators[0]?.id ?? null,
   );
   const [viewMode, setViewMode] = useState<ViewMode>('actual');
   const [overlayData, setOverlayData] = useState<
@@ -81,7 +81,11 @@ export default function SupplyChainPage() {
           {/* Unit label */}
           <span className="text-sm text-gray-500">
             Unit:&nbsp;
-            <span className="font-medium text-gray-700">K / M</span>
+            <span className="font-medium text-gray-700">
+              {selectedIndicatorId
+                ? category.indicators.find((i) => i.id === selectedIndicatorId)?.unit ?? 'Mixed'
+                : 'Mixed'}
+            </span>
           </span>
 
           {/* ViewMode selector */}

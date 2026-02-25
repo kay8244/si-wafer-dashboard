@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   LineChart,
   Line,
@@ -13,6 +14,9 @@ import {
 } from 'recharts';
 import { SupplyChainCategory, ViewMode } from '@/types/v2';
 import { useDarkMode } from '@/hooks/useDarkMode';
+
+type TimeRange = 6 | 12 | 24 | 36;
+const TIME_RANGES: TimeRange[] = [6, 12, 24, 36];
 
 interface OverlayLine {
   name: string;
@@ -81,6 +85,7 @@ export default function IndicatorChart({
   overlayData,
   viewMode = 'actual',
 }: IndicatorChartProps) {
+  const [timeRange, setTimeRange] = useState<TimeRange>(6);
   const { isDark } = useDarkMode();
   const gridColor = isDark ? '#334155' : '#e5e7eb';
   const tickColor = isDark ? '#94a3b8' : undefined;
@@ -93,14 +98,39 @@ export default function IndicatorChart({
       ? category.indicators.filter((ind) => ind.id === selectedIndicatorId)
       : category.indicators;
 
+  // XAxis interval: 12M→0 (all), 24M→1 (every other), 36M→2 (every 3rd)
+  const xAxisInterval = Math.max(0, Math.floor(timeRange / 12) - 1);
+  const xTickFontSize = timeRange <= 12 ? 14 : 12;
+  const showValueLabels = timeRange <= 12;
+
+  // Time range selector component
+  const TimeRangeSelector = (
+    <div className="flex items-center gap-1 overflow-hidden rounded-lg border border-gray-200 text-xs">
+      {TIME_RANGES.map((range) => (
+        <button
+          key={range}
+          onClick={() => setTimeRange(range)}
+          className={`px-3 py-1.5 font-semibold transition-colors ${
+            timeRange === range
+              ? 'bg-blue-600 text-white'
+              : 'bg-white text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          {range}M
+        </button>
+      ))}
+    </div>
+  );
+
   // ── Single indicator selected ──
   if (selectedIndicatorId !== null && indicators.length > 0) {
     const ind = indicators[0];
     const vmLine = VIEW_MODE_LINE[viewMode];
+    const slicedMonthly = ind.monthly.slice(-timeRange);
 
-    const chartData = ind.monthly.map((m) => {
+    const chartData = slicedMonthly.map((m) => {
       const entry: Record<string, string | number> = {
-        month: m.month.slice(5),
+        month: m.month.slice(2).replace('-', '.'),
         [vmLine.label]: getFieldValue(m, viewMode),
       };
       if (overlayData) {
@@ -112,24 +142,30 @@ export default function IndicatorChart({
       return entry;
     });
 
-    // Left Y domain — tight scale around single viewMode values
-    const allLeftValues = ind.monthly.map((m) => getFieldValue(m, viewMode));
+    // Left Y domain — tight scale around sliced viewMode values
+    const allLeftValues = slicedMonthly.map((m) => getFieldValue(m, viewMode));
     const leftDomain = tightDomain(allLeftValues);
 
-    // Right Y domain — tight scale around overlay values
-    const allRightValues = overlayData?.flatMap((ol) => ol.data.map((d) => d.value)) ?? [];
+    // Right Y domain — tight scale around overlay values (filtered to time range)
+    const slicedMonths = new Set(slicedMonthly.map((m) => m.month));
+    const allRightValues = overlayData?.flatMap((ol) => ol.data.filter((d) => slicedMonths.has(d.month)).map((d) => d.value)) ?? [];
     const rightDomain = tightDomain(allRightValues);
 
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-md">
-        {/* Title */}
-        <p className="mb-1 text-lg font-bold text-gray-800">
-          {ind.name}
-          <span className="ml-2 text-sm font-normal text-gray-400">({ind.unit}) — {vmLine.label}</span>
-          {hasOverlay && (
-            <span className="ml-3 text-sm font-normal text-gray-400">| 오른쪽 축: 내부 데이터</span>
-          )}
-        </p>
+        {/* Title + Time Range Selector */}
+        <div className="mb-1 flex items-start justify-between">
+          <div>
+            <p className="text-lg font-bold text-gray-800">
+              {ind.name}
+              <span className="ml-2 text-sm font-normal text-gray-400">({ind.unit}) — {vmLine.label}</span>
+              {hasOverlay && (
+                <span className="ml-3 text-sm font-normal text-gray-400">| 오른쪽 축: 내부 데이터</span>
+              )}
+            </p>
+          </div>
+          {TimeRangeSelector}
+        </div>
         {/* Judgment banner */}
         {ind.judgment && (
           <div className="mb-3 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
@@ -140,7 +176,7 @@ export default function IndicatorChart({
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={chartData} margin={{ top: 20, right: hasOverlay ? 16 : 16, left: 0, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis dataKey="month" tick={{ fontSize: 14, fill: tickColor }} />
+            <XAxis dataKey="month" tick={{ fontSize: xTickFontSize, fill: tickColor }} interval={xAxisInterval} />
             {/* Left Y — single viewMode line with tight domain */}
             <YAxis
               yAxisId="left"
@@ -170,14 +206,16 @@ export default function IndicatorChart({
               dataKey={vmLine.label}
               stroke={vmLine.color}
               strokeWidth={2}
-              dot={{ r: 3 }}
+              dot={{ r: timeRange <= 12 ? 3 : 2 }}
             >
-              <LabelList
-                dataKey={vmLine.label}
-                position="top"
-                formatter={(v: unknown) => formatYValue(Number(v))}
-                style={{ fontSize: 12, fill: vmLine.color, fontWeight: 600 }}
-              />
+              {showValueLabels && (
+                <LabelList
+                  dataKey={vmLine.label}
+                  position="top"
+                  formatter={(v: unknown) => formatYValue(Number(v))}
+                  style={{ fontSize: 12, fill: vmLine.color, fontWeight: 600 }}
+                />
+              )}
             </Line>
             {overlayData?.map((ol) => (
               <Line
@@ -187,15 +225,17 @@ export default function IndicatorChart({
                 dataKey={ol.name}
                 stroke={ol.color}
                 strokeWidth={2}
-                dot={{ r: 3, fill: ol.color }}
+                dot={{ r: timeRange <= 12 ? 3 : 2, fill: ol.color }}
                 strokeDasharray="6 3"
               >
-                <LabelList
-                  dataKey={ol.name}
-                  position="bottom"
-                  formatter={(v: unknown) => formatYValue(Number(v))}
-                  style={{ fontSize: 10, fill: ol.color, fontWeight: 600 }}
-                />
+                {showValueLabels && (
+                  <LabelList
+                    dataKey={ol.name}
+                    position="bottom"
+                    formatter={(v: unknown) => formatYValue(Number(v))}
+                    style={{ fontSize: 10, fill: ol.color, fontWeight: 600 }}
+                  />
+                )}
               </Line>
             ))}
           </LineChart>
@@ -204,12 +244,14 @@ export default function IndicatorChart({
     );
   }
 
-  // ── No selection — show all indicators ──
-  const months = category.indicators[0]?.monthly.map((m) => m.month) ?? [];
+  // ── No selection — show all indicators (sliced to timeRange) ──
+  const allMonths = category.indicators[0]?.monthly.map((m) => m.month) ?? [];
+  const months = allMonths.slice(-timeRange);
+  const offset = allMonths.length - timeRange;
   const chartData = months.map((month, i) => {
-    const entry: Record<string, string | number> = { month: month.slice(5) };
+    const entry: Record<string, string | number> = { month: month.slice(2).replace('-', '.') };
     category.indicators.forEach((ind) => {
-      const m = ind.monthly[i];
+      const m = ind.monthly[offset + i];
       entry[ind.name] = m ? getFieldValue(m, viewMode) : 0;
     });
     if (overlayData) {
@@ -221,32 +263,36 @@ export default function IndicatorChart({
     return entry;
   });
 
-  // Left Y domain — all indicator values
+  // Left Y domain — all indicator values (sliced)
   const allLeftValues = category.indicators.flatMap((ind) =>
-    ind.monthly.map((m) => getFieldValue(m, viewMode)),
+    ind.monthly.slice(-timeRange).map((m) => getFieldValue(m, viewMode)),
   );
   const leftDomain = tightDomain(allLeftValues);
 
-  // Right Y domain — overlay values
-  const allRightValues = overlayData?.flatMap((ol) => ol.data.map((d) => d.value)) ?? [];
+  // Right Y domain — overlay values (filtered to time range)
+  const monthSet = new Set(months);
+  const allRightValues = overlayData?.flatMap((ol) => ol.data.filter((d) => monthSet.has(d.month)).map((d) => d.value)) ?? [];
   const rightDomain = tightDomain(allRightValues);
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-md">
-      <p className="mb-3 text-lg font-bold text-gray-800">
-        All Indicators —{' '}
-        {viewMode === 'actual'
-          ? 'Actual'
-          : viewMode === 'threeMonthMA'
-            ? '3MMA'
-            : viewMode === 'twelveMonthMA'
-              ? '12MMA'
-              : viewMode.toUpperCase()}
-        <span className="ml-2 text-sm font-normal text-gray-400">(행을 클릭하면 개별 지표를 볼 수 있습니다)</span>
-        {hasOverlay && (
-          <span className="ml-3 text-sm font-normal text-gray-400">| 오른쪽 축: 내부 데이터</span>
-        )}
-      </p>
+      <div className="mb-3 flex items-start justify-between">
+        <p className="text-lg font-bold text-gray-800">
+          All Indicators —{' '}
+          {viewMode === 'actual'
+            ? 'Actual'
+            : viewMode === 'threeMonthMA'
+              ? '3MMA'
+              : viewMode === 'twelveMonthMA'
+                ? '12MMA'
+                : viewMode.toUpperCase()}
+          <span className="ml-2 text-sm font-normal text-gray-400">(행을 클릭하면 개별 지표를 볼 수 있습니다)</span>
+          {hasOverlay && (
+            <span className="ml-3 text-sm font-normal text-gray-400">| 오른쪽 축: 내부 데이터</span>
+          )}
+        </p>
+        {TimeRangeSelector}
+      </div>
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={chartData} margin={{ top: 20, right: hasOverlay ? 16 : 16, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
@@ -282,14 +328,16 @@ export default function IndicatorChart({
               dataKey={ind.name}
               stroke={INDICATOR_COLORS[idx % INDICATOR_COLORS.length]}
               strokeWidth={1.5}
-              dot={{ r: 2 }}
+              dot={{ r: timeRange <= 12 ? 2 : 1 }}
             >
-              <LabelList
-                dataKey={ind.name}
-                position="top"
-                formatter={(v: unknown) => formatYValue(Number(v))}
-                style={{ fontSize: 10, fill: INDICATOR_COLORS[idx % INDICATOR_COLORS.length], fontWeight: 600 }}
-              />
+              {showValueLabels && (
+                <LabelList
+                  dataKey={ind.name}
+                  position="top"
+                  formatter={(v: unknown) => formatYValue(Number(v))}
+                  style={{ fontSize: 10, fill: INDICATOR_COLORS[idx % INDICATOR_COLORS.length], fontWeight: 600 }}
+                />
+              )}
             </Line>
           ))}
           {overlayData?.map((ol) => (
@@ -300,15 +348,17 @@ export default function IndicatorChart({
               dataKey={ol.name}
               stroke={ol.color}
               strokeWidth={2}
-              dot={{ r: 3, fill: ol.color }}
+              dot={{ r: timeRange <= 12 ? 3 : 2, fill: ol.color }}
               strokeDasharray="6 3"
             >
-              <LabelList
-                dataKey={ol.name}
-                position="bottom"
-                formatter={(v: unknown) => formatYValue(Number(v))}
-                style={{ fontSize: 10, fill: ol.color, fontWeight: 600 }}
-              />
+              {showValueLabels && (
+                <LabelList
+                  dataKey={ol.name}
+                  position="bottom"
+                  formatter={(v: unknown) => formatYValue(Number(v))}
+                  style={{ fontSize: 10, fill: ol.color, fontWeight: 600 }}
+                />
+              )}
             </Line>
           ))}
         </LineChart>

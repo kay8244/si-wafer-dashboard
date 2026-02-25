@@ -6,11 +6,11 @@ import { OVERLAY_COLORS } from '@/data/v2/supply-chain-mock';
 type SegmentType = 'memory' | 'foundry';
 
 const CATEGORIES: { id: SupplyChainCategoryId; label: string; icon: string }[] = [
-  { id: 'wafer', label: 'Wafer', icon: 'W' },
   { id: 'macro', label: 'Macro', icon: 'M' },
   { id: 'application', label: 'Application', icon: 'A' },
   { id: 'semiconductor', label: 'Semiconductor', icon: 'S' },
   { id: 'equipment', label: 'Equipment', icon: 'E' },
+  { id: 'wafer', label: 'Wafer', icon: 'W' },
 ];
 
 const MEMORY_COMPANIES = ['SEC', 'SK Hynix', 'Micron'];
