@@ -6,16 +6,16 @@ import SupplyChainPage from './supply-chain/SupplyChainPage';
 import VcmPage from './vcm/VcmPage';
 import CustomerDetailPage from './customer-detail/CustomerDetailPage';
 
-type V2Tab = 'supplyChain' | 'vcm' | 'customerDetail';
+type V3Tab = 'supplyChain' | 'vcm' | 'customerDetail';
 
-const TABS: { id: V2Tab; label: string }[] = [
+const TABS: { id: V3Tab; label: string }[] = [
   { id: 'supplyChain', label: '전방시장' },
   { id: 'vcm', label: 'VCM (수요예측)' },
   { id: 'customerDetail', label: '고객별' },
 ];
 
-export default function V2Container() {
-  const [activeTab, setActiveTab] = useState<V2Tab>('supplyChain');
+export default function V3Container() {
+  const [activeTab, setActiveTab] = useState<V3Tab>('supplyChain');
   const { isDark, toggle } = useDarkMode();
 
   return (
@@ -54,10 +54,10 @@ export default function V2Container() {
             )}
           </button>
           <a
-            href="/v3"
-            className="rounded-lg bg-green-50 px-3 py-2 text-center text-xs font-medium text-green-600 transition-colors hover:bg-green-100"
+            href="/v2"
+            className="rounded-lg bg-blue-50 px-3 py-2 text-center text-xs font-medium text-blue-600 transition-colors hover:bg-blue-100"
           >
-            v3
+            v2
           </a>
           <a
             href="/"

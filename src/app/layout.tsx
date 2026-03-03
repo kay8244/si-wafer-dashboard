@@ -2,9 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'SI 웨이퍼 5개사 실적 대시보드',
-  description:
-    '신에츠화학, SUMCO, 글로벌웨이퍼스, 실트로닉, SK실트론 분기별 실적 비교 분석 대시보드',
+  title: 'MI Platform 현황판',
+  description: 'MI Platform 현황판 — 반도체 시장 분석 대시보드',
 };
 
 export default function RootLayout({

@@ -22,7 +22,7 @@ export default function DashboardHeader({ lastUpdated, onRefresh, loading }: Das
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-            SI 웨이퍼 5개사 실적 대시보드
+            MI Platform 현황판
           </h1>
           <p className="mt-1 text-sm text-gray-500">
             신에츠화학 · SUMCO · 글로벌웨이퍼스 · 실트로닉 · SK실트론 분기별 실적 비교

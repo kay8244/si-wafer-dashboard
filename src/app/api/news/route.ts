@@ -112,9 +112,20 @@ async function generateSummary(
       messages: [
         {
           role: 'user',
-          content: `다음은 "${companyName}"에 대한 최근 6개월 이내 뉴스 기사 제목 목록입니다 (최신순 정렬). 가장 최근 기사들을 중심으로 핵심 동향을 3~4줄로 한국어 요약해주세요. 반도체 웨이퍼 산업 관점에서 중요한 포인트와 최신 트렌드를 중심으로 작성하세요.
+          content: `다음은 "${companyName}"에 대한 최근 6개월 이내 뉴스 기사 제목 목록입니다 (최신순 정렬).
 
-중요: 각 사실이나 주장 뒤에 해당 정보의 출처 기사 번호를 [1], [2] 형식으로 반드시 표기하세요. 여러 기사가 관련되면 [1][3] 처럼 복수 표기하세요.
+반도체/웨이퍼 산업 관점에서 핵심 동향을 주제별로 나누어 한국어로 요약해주세요.
+
+형식 규칙:
+- 반드시 각 항목을 "- "로 시작하는 개조식으로 작성
+- 주제별로 하나의 항목으로 작성 (3~5개 항목)
+- 각 항목은 자연스러운 완결된 한국어 문장으로 작성 (문장 중간에 끊기지 않도록)
+- 각 항목 뒤에 출처 기사 번호를 [1], [2] 형식으로 표기. 여러 기사가 관련되면 [1][3] 처럼 복수 표기
+- "#" 헤더나 제목줄은 사용하지 마세요
+
+예시:
+- AI 컴퓨팅 수요 증가로 인한 메모리 병목 현상이 역사적 호황기를 견인 중. [3][4]
+- HBM이 실적 견인의 핵심 동력으로 작용하며, 1Q26 메모리 가격이 사상 최고 수준으로 오를 것으로 전망됨. [1][6]
 
 기사 목록 (최신순):
 ${articleList}
@@ -140,6 +151,11 @@ ${articleList}
   }
 }
 
+/** Build a stable cache key for the full news response (articles + summary) */
+function buildResponseCacheKey(queryKo: string, queryEn: string): string {
+  return `news-full_${queryKo}_${queryEn}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 200);
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const queryKo = searchParams.get('queryKo');
@@ -151,6 +167,14 @@ export async function GET(request: NextRequest) {
       { success: false, error: 'queryKo and queryEn are required' },
       { status: 400 },
     );
+  }
+
+  // Check full response cache first (24h TTL) — avoids RSS fetch + AI call
+  const responseCacheKey = buildResponseCacheKey(queryKo, queryEn);
+  const cachedResponse = await getCached<{ answer: string | null; articles: RssArticle[] }>(responseCacheKey);
+  if (cachedResponse) {
+    console.log(`[News] Full response cache hit for "${queryKo}"`);
+    return NextResponse.json({ success: true, ...cachedResponse });
   }
 
   try {
@@ -165,6 +189,10 @@ export async function GET(request: NextRequest) {
       companyName ?? queryKo,
       articles,
     );
+
+    // Cache full response for 24 hours (1 fetch per day per query)
+    await setCache(responseCacheKey, { answer, articles });
+    console.log(`[News] Cached full response for "${queryKo}"`);
 
     return NextResponse.json({ success: true, answer, articles });
   } catch (err) {

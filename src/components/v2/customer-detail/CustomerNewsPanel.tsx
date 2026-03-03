@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import type { NewsCategory } from '@/types/v2';
 
 interface Article {
@@ -54,7 +54,7 @@ function renderSummaryWithRefs(
             target="_blank"
             rel="noopener noreferrer"
             title={article.title}
-            className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[11px] font-bold text-white no-underline hover:opacity-80"
+            className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold text-white no-underline hover:opacity-80"
             style={{ backgroundColor: color }}
           >
             {match[1]}
@@ -73,20 +73,36 @@ export default function CustomerNewsPanel({
   error,
   accentColor = '#3b82f6',
 }: CustomerNewsPanelProps) {
+  const [articlesExpanded, setArticlesExpanded] = useState(false);
+
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
-      <h3 className="mb-3 text-lg font-bold text-gray-800 dark:text-gray-100">관련 뉴스</h3>
+    <div className="rounded-lg border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-gray-800">
+      {/* Header */}
+      <div className="border-b border-gray-100 px-4 pt-4 pb-3 dark:border-gray-700">
+        <div className="flex items-center gap-2">
+          <div
+            className="h-5 w-1 rounded-full"
+            style={{ backgroundColor: accentColor }}
+          />
+          <h3 className="text-base font-bold text-gray-800 dark:text-gray-100">
+            관련 뉴스
+          </h3>
+        </div>
+      </div>
 
       {/* Loading */}
       {loading && (
-        <div className="space-y-3">
-          <div className="animate-pulse rounded-lg border bg-white p-4 dark:border-gray-600 dark:bg-gray-700">
-            <div className="mb-2 h-3 w-20 rounded bg-gray-200 dark:bg-gray-600" />
-            <div className="mb-1.5 h-3 w-full rounded bg-gray-100 dark:bg-gray-600" />
-            <div className="h-3 w-3/4 rounded bg-gray-100 dark:bg-gray-600" />
+        <div className="space-y-3 p-4">
+          <div className="animate-pulse rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700">
+            <div className="mb-2 h-3 w-16 rounded bg-gray-200 dark:bg-gray-600" />
+            <div className="space-y-2">
+              <div className="h-3 w-full rounded bg-gray-200 dark:bg-gray-600" />
+              <div className="h-3 w-5/6 rounded bg-gray-200 dark:bg-gray-600" />
+              <div className="h-3 w-3/4 rounded bg-gray-200 dark:bg-gray-600" />
+            </div>
           </div>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="animate-pulse rounded-lg border bg-white p-3 dark:border-gray-600 dark:bg-gray-700">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="animate-pulse rounded-lg border border-gray-100 p-3 dark:border-gray-600">
               <div className="mb-1.5 h-3 w-2/3 rounded bg-gray-200 dark:bg-gray-600" />
               <div className="h-2.5 w-1/4 rounded bg-gray-100 dark:bg-gray-600" />
             </div>
@@ -96,77 +112,119 @@ export default function CustomerNewsPanel({
 
       {/* Error */}
       {!loading && error && (
-        <p className="text-xs text-red-500">{error}</p>
+        <div className="p-4">
+          <p className="text-xs text-red-500">{error}</p>
+        </div>
       )}
 
       {/* Content */}
       {!loading && !error && (
-        <div className="space-y-2.5">
-          {/* AI Summary with numbered references */}
+        <div className="flex flex-col">
+          {/* AI Summary - always visible */}
           {answer && (
-            <div
-              className="rounded-xl border-l-4 bg-white p-4 shadow-sm dark:bg-gray-700/50"
-              style={{ borderLeftColor: accentColor }}
-            >
-              <h4 className="mb-1.5 text-sm font-bold text-gray-800 dark:text-gray-200">AI 요약</h4>
-              <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700 dark:text-gray-300">
-                {renderSummaryWithRefs(answer, articles, accentColor)}
-              </p>
+            <div className="p-4 pb-2">
+              <div
+                className="rounded-lg border-l-4 bg-gradient-to-r from-gray-50 to-white p-4 dark:from-gray-700/50 dark:to-gray-800"
+                style={{ borderLeftColor: accentColor }}
+              >
+                <div className="mb-2 flex items-center gap-1.5">
+                  <svg className="h-3.5 w-3.5" style={{ color: accentColor }} fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11H9v-2h2v2zm0-4H9V5h2v4z" />
+                  </svg>
+                  <span className="text-xs font-bold" style={{ color: accentColor }}>AI 요약</span>
+                </div>
+                <p className="text-[13px] leading-[1.7] text-gray-700 dark:text-gray-300">
+                  {renderSummaryWithRefs(answer, articles, accentColor)}
+                </p>
+              </div>
             </div>
           )}
 
-          {/* Numbered article list */}
-          {articles.slice(0, 5).map((article, i) => {
-            const cats = article.categories ?? [];
-            const borderClass = cats.length > 0 ? `border-l-2 ${CATEGORY_BORDER[cats[0]]}` : '';
-
-            return (
-              <a
-                key={i}
-                href={article.url && article.url !== '#' ? article.url : undefined}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`group flex items-start gap-3 rounded-lg border bg-white p-3 transition-all hover:shadow-md dark:border-gray-600 dark:bg-gray-700/50 dark:hover:bg-gray-700 ${borderClass}`}
+          {/* Articles section - collapsible */}
+          {articles.length > 0 && (
+            <div className="flex flex-col px-4 pb-4">
+              {/* Toggle button */}
+              <button
+                onClick={() => setArticlesExpanded(!articlesExpanded)}
+                className="mb-2 flex items-center gap-1.5 self-start rounded-md px-2 py-1 text-xs font-semibold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
               >
-                <span
-                  className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-                  style={{ backgroundColor: accentColor }}
+                <svg
+                  className={`h-3 w-3 transition-transform ${articlesExpanded ? 'rotate-90' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
                 >
-                  {i + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h4 className="mb-1 text-sm font-semibold text-gray-900 group-hover:text-blue-600 dark:text-gray-100 dark:group-hover:text-blue-400">
-                    {article.title}
-                  </h4>
-                  {/* Category tags */}
-                  {cats.length > 0 && (
-                    <div className="mb-1 flex flex-wrap gap-1">
-                      {cats.map((cat) => (
-                        <span
-                          key={cat}
-                          className={`inline-block rounded-full px-1.5 py-0.5 text-xs font-medium ${CATEGORY_COLORS[cat]}`}
-                        >
-                          {cat}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
-                    <span>{article.source}</span>
-                    {article.publishedDate && (
-                      <span>{new Date(article.publishedDate).toLocaleDateString('ko-KR')}</span>
-                    )}
-                    {article.url && article.url !== '#' && (
-                      <span className="ml-auto text-blue-500 group-hover:underline">원문 보기</span>
-                    )}
-                  </div>
-                </div>
-              </a>
-            );
-          })}
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                관련 기사 {articles.slice(0, 5).length}건
+              </button>
 
-          {articles.length === 0 && (
-            <p className="text-xs text-gray-400 dark:text-gray-500">뉴스가 없습니다.</p>
+              {articlesExpanded && (
+                <div className="flex flex-col gap-2">
+                  {articles.slice(0, 5).map((article, i) => {
+                    const cats = article.categories ?? [];
+                    const borderClass = cats.length > 0 ? `border-l-2 ${CATEGORY_BORDER[cats[0]]}` : '';
+
+                    return (
+                      <a
+                        key={i}
+                        href={article.url && article.url !== '#' ? article.url : undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`group flex items-start gap-2.5 rounded-lg border border-gray-100 bg-white p-3 transition-all hover:border-gray-200 hover:shadow-sm dark:border-gray-600 dark:bg-gray-700/50 dark:hover:border-gray-500 dark:hover:bg-gray-700 ${borderClass}`}
+                      >
+                        <span
+                          className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                          style={{ backgroundColor: accentColor }}
+                        >
+                          {i + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="mb-1 text-[13px] font-semibold leading-snug text-gray-800 group-hover:text-blue-600 dark:text-gray-100 dark:group-hover:text-blue-400">
+                            {article.title}
+                          </h4>
+                          {/* Category tags */}
+                          {cats.length > 0 && (
+                            <div className="mb-1 flex flex-wrap gap-1">
+                              {cats.map((cat) => (
+                                <span
+                                  key={cat}
+                                  className={`inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium ${CATEGORY_COLORS[cat]}`}
+                                >
+                                  {cat}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500">
+                            <span className="font-medium text-gray-500 dark:text-gray-400">{article.source}</span>
+                            {article.publishedDate && (
+                              <>
+                                <span className="text-gray-300 dark:text-gray-600">|</span>
+                                <span>{new Date(article.publishedDate).toLocaleDateString('ko-KR')}</span>
+                              </>
+                            )}
+                            {article.url && article.url !== '#' && (
+                              <span className="ml-auto text-blue-500 opacity-0 transition-opacity group-hover:opacity-100">
+                                원문 &rarr;
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Empty state */}
+          {articles.length === 0 && !answer && (
+            <div className="p-4">
+              <p className="text-xs text-gray-400 dark:text-gray-500">뉴스가 없습니다.</p>
+            </div>
           )}
         </div>
       )}

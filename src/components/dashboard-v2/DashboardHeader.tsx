@@ -22,7 +22,7 @@ export default function DashboardHeader({ lastUpdated, onRefresh, loading }: Das
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-            SI 웨이퍼 대시보드
+            MI Platform 현황판
           </h1>
           {formattedDate && (
             <p className="mt-1.5 text-sm text-slate-400">
