@@ -575,22 +575,22 @@ const DEVICE_STACKED_BY_APP: Record<ApplicationType, DeviceStackedEntry[]> = {
 };
 
 const TOTAL_WAFER_QUARTERLY: TotalWaferQuarterlyEntry[] = [
-  { quarter: "Q2'23", total: 1380, pw: 800,  epi: 580, isEstimate: false },
-  { quarter: "Q3'23", total: 1640, pw: 985,  epi: 655, isEstimate: false },
-  { quarter: "Q4'23", total: 1810, pw: 1115, epi: 695, isEstimate: false },
-  { quarter: "Q1'24", total: 1290, pw: 755,  epi: 535, isEstimate: false },
-  { quarter: "Q2'24", total: 1580, pw: 940,  epi: 640, isEstimate: false },
-  { quarter: "Q3'24", total: 1980, pw: 1215, epi: 765, isEstimate: false },
-  { quarter: "Q4'24", total: 2210, pw: 1395, epi: 815, isEstimate: false },
-  { quarter: "Q1'25", total: 1520, pw: 895,  epi: 625, isEstimate: false },
-  { quarter: "Q2'25", total: 1760, pw: 1060, epi: 700, isEstimate: false },
-  { quarter: "Q3'25", total: 2320, pw: 1450, epi: 870, isEstimate: false },
-  { quarter: "Q4'25", total: 2580, pw: 1650, epi: 930, isEstimate: false },
-  { quarter: "Q1'26", total: 1720, pw: 1015, epi: 705, isEstimate: false },
-  { quarter: "Q2'26", total: 2020, pw: 1225, epi: 795, isEstimate: true },
-  { quarter: "Q3'26", total: 2620, pw: 1650, epi: 970, isEstimate: true },
-  { quarter: "Q4'26", total: 2850, pw: 1830, epi: 1020, isEstimate: true },
-  { quarter: "Q1'27", total: 1960, pw: 1170, epi: 790, isEstimate: true },
+  { quarter: "Q2'23", total: 1420, pw: 830,  epi: 590, isEstimate: false },
+  { quarter: "Q3'23", total: 1750, pw: 1080, epi: 670, isEstimate: false },
+  { quarter: "Q4'23", total: 1680, pw: 1020, epi: 660, isEstimate: false },
+  { quarter: "Q1'24", total: 1190, pw: 680,  epi: 510, isEstimate: false },
+  { quarter: "Q2'24", total: 1650, pw: 1010, epi: 640, isEstimate: false },
+  { quarter: "Q3'24", total: 2150, pw: 1360, epi: 790, isEstimate: false },
+  { quarter: "Q4'24", total: 2080, pw: 1280, epi: 800, isEstimate: false },
+  { quarter: "Q1'25", total: 1450, pw: 840,  epi: 610, isEstimate: false },
+  { quarter: "Q2'25", total: 1920, pw: 1180, epi: 740, isEstimate: false },
+  { quarter: "Q3'25", total: 2480, pw: 1580, epi: 900, isEstimate: false },
+  { quarter: "Q4'25", total: 2350, pw: 1470, epi: 880, isEstimate: false },
+  { quarter: "Q1'26", total: 1680, pw: 990,  epi: 690, isEstimate: false },
+  { quarter: "Q2'26", total: 2180, pw: 1350, epi: 830, isEstimate: true },
+  { quarter: "Q3'26", total: 2750, pw: 1760, epi: 990, isEstimate: true },
+  { quarter: "Q4'26", total: 2620, pw: 1640, epi: 980, isEstimate: true },
+  { quarter: "Q1'27", total: 1850, pw: 1090, epi: 760, isEstimate: true },
 ];
 
 // Quarterly per-unit capacity (대당 탑재량 = wafer sheets / device units)

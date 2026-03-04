@@ -1,6 +1,7 @@
 'use client';
 
-import { ReactNode, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { parseAiBullets, renderWithRefs } from '@/lib/news-utils';
 
 interface Article {
   title: string;
@@ -43,53 +44,7 @@ export default function CustomerNewsPanel({
     return customerLabel;
   }, [customerLabel]);
 
-  // Parse answer into bullet points
-  const bullets = useMemo(() => {
-    if (!answer) return [];
-    const lines = answer
-      .split(/\n+/)
-      .map((l) => l.replace(/^[-•*]\s*/, '').trim())
-      .filter((l) => l);
-    if (lines.length > 1) return lines.slice(0, 4);
-    return answer
-      .split(/(?<=[.!?。])\s+/)
-      .filter((s) => s.trim())
-      .map((s) => s.trim())
-      .slice(0, 4);
-  }, [answer]);
-
-  /** Render text with clickable [N] reference circles */
-  function renderWithRefs(text: string): ReactNode {
-    const parts = text.split(/\[(\d+)\]/g);
-    if (parts.length === 1) return <>{text}</>;
-    return (
-      <>
-        {parts.map((part, i) => {
-          if (i % 2 === 1) {
-            const refIdx = parseInt(part) - 1;
-            const article = list[refIdx];
-            if (article) {
-              return (
-                <a
-                  key={i}
-                  href={article.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white align-text-top mx-0.5 cursor-pointer hover:opacity-80 transition-opacity"
-                  style={{ backgroundColor: accentColor }}
-                  title={article.title}
-                >
-                  {refIdx + 1}
-                </a>
-              );
-            }
-            return <span key={i}>[{part}]</span>;
-          }
-          return <span key={i}>{part}</span>;
-        })}
-      </>
-    );
-  }
+  const bullets = useMemo(() => parseAiBullets(answer, 4), [answer]);
 
   if (loading) {
     return (
@@ -137,7 +92,7 @@ export default function CustomerNewsPanel({
             {bullets.map((bullet, idx) => (
               <li key={idx} className="flex gap-1.5">
                 <span className="mt-0.5 shrink-0 text-gray-400">•</span>
-                <span>{renderWithRefs(bullet)}</span>
+                <span>{renderWithRefs(bullet, list, accentColor)}</span>
               </li>
             ))}
           </ul>

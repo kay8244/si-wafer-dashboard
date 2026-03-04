@@ -108,7 +108,7 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
   }, [filteredData]);
 
   return (
-    <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
+    <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800" style={{ minHeight: 530 }}>
       {/* Header row: title + time range buttons + legend */}
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="shrink-0 text-base font-bold text-gray-800 dark:text-gray-100">
@@ -173,7 +173,7 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
       </div>
 
       {/* Chart area — fixed height */}
-      <div style={{ height: 340 }}>
+      <div style={{ height: 240 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={filteredData} margin={{ top: 28, right: 16, left: 8, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { parseAiBullets, renderWithRefs } from '@/lib/news-utils';
 import type { AppCategoryItem, AppCategoryType, ApplicationType, DeviceFilterItem, DeviceStackedEntry, TotalWaferQuarterlyEntry } from '@/types/v3';
 import { VCM_DATA, NEWS_QUERIES_BY_CATEGORY } from '@/data/v3/vcm-mock';
 import { useV2News, type NewsArticle } from '@/hooks/useV2News';
@@ -54,20 +55,7 @@ function InlineNews({
   const [expanded, setExpanded] = useState(false);
   const list = articles.slice(0, 10);
 
-  // Parse answer into bullet points — prefer line-based "- " bullets, fallback to sentence split
-  const bullets = useMemo(() => {
-    if (!answer) return [];
-    // Split by newlines, strip bullet prefixes, filter blanks and # headers
-    const lines = answer.split(/\n+/)
-      .map((l) => l.replace(/^[-•*]\s*/, '').trim())
-      .filter((l) => l && !l.startsWith('#'));
-    if (lines.length > 1) return lines;
-    // Fallback: split by sentence boundaries for single-block text
-    return answer
-      .split(/(?<=[.!?。])\s+/)
-      .map((s) => s.replace(/^[-•*]\s*/, '').trim())
-      .filter((s) => s && !s.startsWith('#'));
-  }, [answer]);
+  const bullets = useMemo(() => parseAiBullets(answer), [answer]);
 
   if (loading) {
     return (
@@ -79,39 +67,6 @@ function InlineNews({
   }
 
   if (!answer && list.length === 0) return null;
-
-  /** Render text with clickable [N] reference circles */
-  function renderWithRefs(text: string) {
-    const parts = text.split(/\[(\d+)\]/g);
-    if (parts.length === 1) return <>{text}</>;
-    return (
-      <>
-        {parts.map((part, i) => {
-          if (i % 2 === 1) {
-            const refIdx = parseInt(part) - 1;
-            const article = list[refIdx];
-            if (article) {
-              return (
-                <a
-                  key={i}
-                  href={article.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white align-text-top mx-0.5 cursor-pointer hover:opacity-80 transition-opacity"
-                  style={{ backgroundColor: accentColor }}
-                  title={article.title}
-                >
-                  {refIdx + 1}
-                </a>
-              );
-            }
-            return <span key={i}>[{part}]</span>;
-          }
-          return <span key={i}>{part}</span>;
-        })}
-      </>
-    );
-  }
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -132,7 +87,7 @@ function InlineNews({
             {bullets.map((bullet, idx) => (
               <li key={idx} className="flex gap-1.5">
                 <span className="mt-0.5 shrink-0 text-gray-400">•</span>
-                <span>{renderWithRefs(bullet)}</span>
+                <span>{renderWithRefs(bullet, list, accentColor)}</span>
               </li>
             ))}
           </ul>
@@ -249,50 +204,7 @@ function WaferDemandAnalysis({
     };
   }, [data]);
 
-  // Parse AI answer into bullet points — prefer line-based "- " bullets, fallback to sentence split
-  const aiBullets = useMemo(() => {
-    if (!aiAnswer) return [];
-    const lines = aiAnswer.split(/\n+/)
-      .map((l) => l.replace(/^[-•*]\s*/, '').trim())
-      .filter((l) => l && !l.startsWith('#'));
-    if (lines.length > 1) return lines;
-    return aiAnswer
-      .split(/(?<=[.!?。])\s+/)
-      .map((s) => s.replace(/^[-•*]\s*/, '').trim())
-      .filter((s) => s && !s.startsWith('#'));
-  }, [aiAnswer]);
-
-  /** Render text with clickable [N] reference circles */
-  function renderWithRefs(text: string) {
-    const parts = text.split(/\[(\d+)\]/g);
-    if (parts.length === 1) return <>{text}</>;
-    return (
-      <>
-        {parts.map((part, i) => {
-          if (i % 2 === 1) {
-            const refIdx = parseInt(part) - 1;
-            const article = list[refIdx];
-            if (article) {
-              return (
-                <a
-                  key={i}
-                  href={article.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white align-text-top mx-0.5 cursor-pointer hover:opacity-80 transition-opacity bg-purple-500"
-                  title={article.title}
-                >
-                  {refIdx + 1}
-                </a>
-              );
-            }
-            return <span key={i}>[{part}]</span>;
-          }
-          return <span key={i}>{part}</span>;
-        })}
-      </>
-    );
-  }
+  const aiBullets = useMemo(() => parseAiBullets(aiAnswer), [aiAnswer]);
 
   if (!analysis) return null;
 
@@ -343,7 +255,7 @@ function WaferDemandAnalysis({
           aiBullets.map((bullet, idx) => (
             <li key={idx} className="flex gap-1.5">
               <span className="shrink-0 text-gray-400">•</span>
-              <span>{renderWithRefs(bullet)}</span>
+              <span>{renderWithRefs(bullet, list, '#8b5cf6')}</span>
             </li>
           ))
         ) : (
@@ -518,7 +430,7 @@ export default function VcmPage() {
   }
 
   return (
-    <div className="flex h-full flex-col" style={{ height: 'calc(100vh - 180px)' }}>
+    <div className="flex h-full flex-col" style={{ height: 'calc(100vh - 80px)' }}>
       {/* ===== MAIN: Left (Total) | Right (App Detail) — symmetric ===== */}
       <div className="flex min-h-0 flex-1">
         {/* LEFT COLUMN: Total Wafer */}

@@ -37,7 +37,7 @@ export default function CustomerDetailPage() {
   const newsArticles = data.newsQueryKo ? articles : fallbackArticles;
 
   return (
-    <div className="flex h-full flex-col" style={{ height: 'calc(100vh - 180px)' }}>
+    <div className="flex h-full flex-col" style={{ height: 'calc(100vh - 80px)' }}>
       {/* Customer tabs */}
       <div className="flex items-center gap-4 border-b border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900">
         {/* Memory */}

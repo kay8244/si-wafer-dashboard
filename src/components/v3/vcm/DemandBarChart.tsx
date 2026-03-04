@@ -187,7 +187,7 @@ export default function DemandBarChart({
   }, [filteredData]);
 
   return (
-    <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
+    <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800" style={{ minHeight: 530 }}>
       {/* Header: title + time range selector */}
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">{title}</h3>
@@ -241,7 +241,7 @@ export default function DemandBarChart({
         </div>
       )}
 
-      <div style={{ height: 200 }}>
+      <div style={{ height: 240 }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 20, right: 8, left: 8, bottom: 4 }}>
             <XAxis
