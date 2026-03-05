@@ -145,7 +145,7 @@ export interface VcmData {
 
 export type MemoryCustomerId = 'SEC' | 'SKHynix' | 'Micron' | 'Koxia';
 export type FoundryCustomerId = 'SEC_Foundry' | 'TSMC' | 'SMC' | 'GFS' | 'STM' | 'Intel';
-export type AggregateCustomerId = 'Total_DRAM_NAND';
+export type AggregateCustomerId = 'Total_DRAM_NAND' | 'Total_Foundry';
 export type CustomerDetailId = MemoryCustomerId | FoundryCustomerId | AggregateCustomerId;
 
 export type CustomerMetricId =
@@ -176,6 +176,7 @@ export interface MonthlyMetricData {
   utilization: number;
   inventoryLevel: number;
   capa: number;
+  dramRatio?: number;
 }
 
 export interface MonthlyGrowthEntry {
@@ -257,6 +258,9 @@ export interface CustomerExecutive {
   productMixTrend: ProductMixTrend[];
   waferInput: WaferInputData[];
   monthlyMetrics: MonthlyMetricData[];
+  monthlyMetricsPrev?: MonthlyMetricData[];
+  versionLabel?: string;
+  prevVersionLabel?: string;
   scrapRate: ScrapRate[];
   externalComparison: ExternalComparison[];
   news: CustomerNews[];

@@ -36,6 +36,7 @@ export function useNandCustomerNews(customerId: NandCustomerId | null) {
           queryKo: customer.newsQueryKo,
           queryEn: customer.newsQueryEn,
           companyName: customer.nameKo,
+          context: `${customer.nameKo} NAND 고객사 - 해당 고객의 NAND/SSD 수요 및 웨이퍼 수급 영향`,
         });
         const res = await fetch(`/api/news?${params}`, {
           signal: controller.signal,

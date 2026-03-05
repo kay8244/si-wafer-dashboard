@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   BarChart,
   Bar,
@@ -89,6 +89,7 @@ export default function DemandBarChart({
   mountData,
 }: DemandBarChartProps) {
   const { isDark } = useDarkMode();
+  const [showQoQ, setShowQoQ] = useState(false);
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
   const labelFill = isDark ? '#cbd5e1' : '#374151';
   const tooltipStyle = isDark
@@ -191,6 +192,18 @@ export default function DemandBarChart({
       {/* Header: title + time range selector */}
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">{title}</h3>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowQoQ((v) => !v)}
+            className={`rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+              showQoQ
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+            }`}
+          >
+            QoQ
+          </button>
+        </div>
         <div className="flex items-center gap-1">
           {TIME_PRESETS.map((preset) => (
             <button
@@ -388,6 +401,42 @@ export default function DemandBarChart({
                   </td>
                 ))}
               </tr>
+              {/* Primary QoQ */}
+              {showQoQ && (
+                <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                  {filteredData.map((d, i) => {
+                    const prev = i > 0 ? filteredData[i - 1].value : null;
+                    const qoq = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
+                    const sign = qoq !== null && qoq > 0 ? '+' : '';
+                    const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                    return (
+                      <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                        {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              )}
+              {/* Primary CAGR (12Q only) */}
+              {timeRange === 12 && (() => {
+                const vals = filteredData.map((d) => d.value);
+                const first = vals[0];
+                const last = vals[vals.length - 1];
+                const years = (filteredData.length - 1) / 4;
+                const cagr = first > 0 && last > 0 && years > 0 ? (Math.pow(last / first, 1 / years) - 1) * 100 : null;
+                return (
+                  <tr className="bg-blue-50/50 dark:bg-blue-900/20">
+                    <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
+                    <td
+                      colSpan={filteredData.length}
+                      className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400"
+                    >
+                      {cagr !== null ? `${cagr > 0 ? '+' : ''}${cagr.toFixed(1)}%` : '-'}
+                    </td>
+                  </tr>
+                );
+              })()}
               {/* Primary mount row (Trad. 탑재량) — right after primary demand */}
               {mountData?.filter((m) => m.group === 'primary').map((mount) => (
                 <tr key={mount.label} className="bg-gray-50 dark:bg-gray-700">
@@ -422,6 +471,42 @@ export default function DemandBarChart({
                   ))}
                 </tr>
               )}
+              {/* Secondary QoQ */}
+              {showQoQ && hasDualBars && filteredSecondary && (
+                <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                  {filteredSecondary.map((d, i) => {
+                    const prev = i > 0 ? filteredSecondary[i - 1].value : null;
+                    const qoq = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
+                    const sign = qoq !== null && qoq > 0 ? '+' : '';
+                    const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                    return (
+                      <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                        {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              )}
+              {/* Secondary CAGR (12Q only) */}
+              {timeRange === 12 && hasDualBars && filteredSecondary && (() => {
+                const vals = filteredSecondary.map((d) => d.value);
+                const first = vals[0];
+                const last = vals[vals.length - 1];
+                const years = (filteredSecondary.length - 1) / 4;
+                const cagr = first > 0 && last > 0 && years > 0 ? (Math.pow(last / first, 1 / years) - 1) * 100 : null;
+                return (
+                  <tr className="bg-blue-50/50 dark:bg-blue-900/20">
+                    <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
+                    <td
+                      colSpan={filteredSecondary.length}
+                      className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400"
+                    >
+                      {cagr !== null ? `${cagr > 0 ? '+' : ''}${cagr.toFixed(1)}%` : '-'}
+                    </td>
+                  </tr>
+                );
+              })()}
               {/* Secondary mount row (AI 탑재량) — right after secondary demand */}
               {mountData?.filter((m) => m.group === 'secondary').map((mount) => (
                 <tr key={mount.label} className="bg-gray-50 dark:bg-gray-700">

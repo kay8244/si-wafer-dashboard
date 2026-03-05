@@ -48,6 +48,7 @@ function getQuarterLabel(quarter: string): string {
 export default function TotalWaferLineChart({ data, timeRange: controlledRange, onTimeRangeChange }: Props) {
   const { isDark } = useDarkMode();
   const [internalRange, setInternalRange] = useState<TimeRange>(8);
+  const [showQoQ, setShowQoQ] = useState(false);
   const timeRange = controlledRange ?? internalRange;
   const setTimeRange = onTimeRangeChange ?? setInternalRange;
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
@@ -115,7 +116,19 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
           Total Wafer 수요
         </h3>
 
-        {/* Time range presets */}
+        {/* QoQ toggle + Time range presets */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowQoQ((v) => !v)}
+            className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+              showQoQ
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+            }`}
+          >
+            QoQ
+          </button>
+        </div>
         <div className="flex items-center gap-1">
           {TIME_PRESETS.map((preset) => (
             <button
@@ -324,48 +337,110 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
               </tr>
             </thead>
             <tbody>
-              {/* EPI first */}
+              {/* EPI */}
               <tr className="bg-white dark:bg-gray-800">
                 <td className="px-2 py-1 border border-gray-200 font-medium text-emerald-600 whitespace-nowrap dark:border-gray-600">EPI</td>
                 {filteredData.map((d) => (
-                  <td
-                    key={d.quarter}
-                    className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
-                      d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
+                  <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>
                     {d.epi.toLocaleString()}
                   </td>
                 ))}
               </tr>
-              {/* PW second */}
+              {/* EPI QoQ */}
+              {showQoQ && (
+                <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-emerald-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                  {filteredData.map((d, i) => {
+                    const prev = i > 0 ? filteredData[i - 1].epi : null;
+                    const qoq = prev && prev > 0 ? ((d.epi - prev) / prev) * 100 : null;
+                    const sign = qoq !== null && qoq > 0 ? '+' : '';
+                    const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                    return (
+                      <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                        {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              )}
+              {/* PW */}
               <tr className="bg-gray-50 dark:bg-gray-700">
                 <td className="px-2 py-1 border border-gray-200 font-medium text-blue-600 whitespace-nowrap dark:border-gray-600">PW</td>
                 {filteredData.map((d) => (
-                  <td
-                    key={d.quarter}
-                    className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
-                      d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
+                  <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>
                     {d.pw.toLocaleString()}
                   </td>
                 ))}
               </tr>
+              {/* PW QoQ */}
+              {showQoQ && (
+                <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-blue-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                  {filteredData.map((d, i) => {
+                    const prev = i > 0 ? filteredData[i - 1].pw : null;
+                    const qoq = prev && prev > 0 ? ((d.pw - prev) / prev) * 100 : null;
+                    const sign = qoq !== null && qoq > 0 ? '+' : '';
+                    const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                    return (
+                      <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                        {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              )}
               {/* Total */}
               <tr className="bg-gray-100 dark:bg-gray-600 font-semibold">
                 <td className="px-2 py-1 border border-gray-200 font-semibold text-gray-700 whitespace-nowrap dark:border-gray-600 dark:text-gray-200">Total</td>
                 {filteredData.map((d) => (
-                  <td
-                    key={d.quarter}
-                    className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
-                      d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-200'
-                    }`}
-                  >
+                  <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-200'}`}>
                     {d.total.toLocaleString()}
                   </td>
                 ))}
               </tr>
+              {/* Total QoQ */}
+              {showQoQ && (
+                <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                  {filteredData.map((d, i) => {
+                    const prev = i > 0 ? filteredData[i - 1].total : null;
+                    const qoq = prev && prev > 0 ? ((d.total - prev) / prev) * 100 : null;
+                    const sign = qoq !== null && qoq > 0 ? '+' : '';
+                    const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                    return (
+                      <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                        {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              )}
+              {/* CAGR rows (12Q only) */}
+              {timeRange === 12 && (() => {
+                const first = filteredData[0];
+                const last = filteredData[filteredData.length - 1];
+                const years = (filteredData.length - 1) / 4;
+                if (!first || !last || years <= 0) return null;
+                const calc = (start: number, end: number) =>
+                  start > 0 && end > 0 ? (Math.pow(end / start, 1 / years) - 1) * 100 : null;
+                const epiCagr = calc(first.epi, last.epi);
+                const pwCagr = calc(first.pw, last.pw);
+                const totalCagr = calc(first.total, last.total);
+                const fmt = (v: number | null) => v !== null ? `${v > 0 ? '+' : ''}${v.toFixed(1)}%` : '-';
+                return (
+                  <>
+                    <tr className="bg-blue-50/50 dark:bg-blue-900/20">
+                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
+                      <td
+                        colSpan={filteredData.length}
+                        className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400"
+                      >
+                        EPI {fmt(epiCagr)} / PW {fmt(pwCagr)} / Total {fmt(totalCagr)}
+                      </td>
+                    </tr>
+                  </>
+                );
+              })()}
             </tbody>
           </table>
         </div>

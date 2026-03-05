@@ -9,7 +9,7 @@ export interface NewsArticle {
   publishedDate: string | null;
 }
 
-export function useV2News(queryKo: string | null, queryEn: string | null, companyName?: string) {
+export function useV2News(queryKo: string | null, queryEn: string | null, companyName?: string, context?: string) {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [answer, setAnswer] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -33,6 +33,7 @@ export function useV2News(queryKo: string | null, queryEn: string | null, compan
           queryKo: queryKo as string,
           queryEn: queryEn as string,
           ...(companyName ? { companyName } : {}),
+          ...(context ? { context } : {}),
         });
         const res = await fetch(`/api/news?${params}`, {
           signal: controller.signal,
@@ -51,7 +52,7 @@ export function useV2News(queryKo: string | null, queryEn: string | null, compan
 
     fetchNews();
     return () => controller.abort();
-  }, [queryKo, queryEn, companyName]);
+  }, [queryKo, queryEn, companyName, context]);
 
   return { articles, answer, loading, error };
 }

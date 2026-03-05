@@ -36,6 +36,7 @@ export function useFoundryCustomerNews(customerId: FoundryCustomerId | null) {
           queryKo: customer.newsQueryKo,
           queryEn: customer.newsQueryEn,
           companyName: customer.nameKo,
+          context: `${customer.nameKo} 파운드리 고객사 - 해당 고객의 반도체 생산/위탁 및 웨이퍼 수급 영향`,
         });
         const res = await fetch(`/api/news?${params}`, {
           signal: controller.signal,

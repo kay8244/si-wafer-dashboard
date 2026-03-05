@@ -82,6 +82,34 @@ function tightDomain(values: number[]): [number, number] {
   return [lo < 0 && min >= 0 ? 0 : lo, max + padding];
 }
 
+/** Pearson correlation coefficient between two numeric arrays of equal length */
+function pearsonCorrelation(x: number[], y: number[]): number | null {
+  const n = x.length;
+  if (n < 3 || n !== y.length) return null;
+  const meanX = x.reduce((a, b) => a + b, 0) / n;
+  const meanY = y.reduce((a, b) => a + b, 0) / n;
+  let num = 0, denX = 0, denY = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = x[i] - meanX;
+    const dy = y[i] - meanY;
+    num += dx * dy;
+    denX += dx * dx;
+    denY += dy * dy;
+  }
+  const den = Math.sqrt(denX * denY);
+  if (den === 0) return null;
+  return num / den;
+}
+
+/** Interpret correlation strength */
+function corrLabel(r: number): { text: string; color: string } {
+  const abs = Math.abs(r);
+  if (abs >= 0.8) return { text: '강한', color: r > 0 ? '#dc2626' : '#2563eb' };
+  if (abs >= 0.6) return { text: '보통', color: r > 0 ? '#d97706' : '#7c3aed' };
+  if (abs >= 0.4) return { text: '약한', color: '#6b7280' };
+  return { text: '미약', color: '#9ca3af' };
+}
+
 /** Format Y-axis values compactly */
 function formatYValue(value: number): string {
   if (Math.abs(value) >= 10000) return `${(value / 1000).toFixed(0)}K`;
@@ -153,6 +181,21 @@ export default function IndicatorChart({
     const ind = indicators[0];
     const vmLine = VIEW_MODE_LINE[viewMode];
     const slicedMonthly = ind.monthly.slice(-timeRange);
+
+    // Compute correlation between external indicator and each overlay
+    const correlations: { name: string; r: number; color: string }[] = [];
+    if (overlayData && overlayData.length > 0) {
+      const extByMonth = new Map(slicedMonthly.map((m) => [m.month, getFieldValue(m, viewMode)]));
+      overlayData.forEach((ol) => {
+        const pairs: { x: number; y: number }[] = [];
+        ol.data.forEach((d) => {
+          const ext = extByMonth.get(d.month);
+          if (ext !== undefined) pairs.push({ x: ext, y: d.value });
+        });
+        const r = pearsonCorrelation(pairs.map((p) => p.x), pairs.map((p) => p.y));
+        if (r !== null) correlations.push({ name: ol.name, r, color: ol.color });
+      });
+    }
 
     const chartData = slicedMonthly.map((m) => {
       const entry: Record<string, string | number> = {
@@ -237,6 +280,39 @@ export default function IndicatorChart({
             </div>
           );
         })()}
+        <div className="relative">
+        {/* Correlation badges — positioned inside chart area */}
+        {correlations.length > 0 && (
+          <div className="absolute top-7 right-24 z-10 flex flex-col gap-1">
+            {correlations.map((c) => {
+              const info = corrLabel(c.r);
+              return (
+                <div
+                  key={c.name}
+                  className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold shadow-sm backdrop-blur-sm"
+                  style={{
+                    borderColor: c.color + '40',
+                    backgroundColor: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.9)',
+                  }}
+                >
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: c.color }}
+                  />
+                  <span style={{ color: isDark ? '#e2e8f0' : '#374151' }}>
+                    {c.name.split(' (')[0]}
+                  </span>
+                  <span style={{ color: info.color, fontWeight: 700 }}>
+                    r={c.r >= 0 ? '+' : ''}{c.r.toFixed(2)}
+                  </span>
+                  <span style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
+                    ({info.text} {c.r >= 0 ? '양' : '음'}의 상관)
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={chartData} margin={{ top: 20, right: hasOverlay ? 16 : 16, left: 0, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
@@ -304,6 +380,7 @@ export default function IndicatorChart({
             ))}
           </LineChart>
         </ResponsiveContainer>
+        </div>
       </div>
     );
   }

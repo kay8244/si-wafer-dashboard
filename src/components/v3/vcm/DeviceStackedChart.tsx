@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import {
   BarChart,
   Bar,
@@ -78,6 +78,7 @@ function getQuarterLabel(quarter: string): string {
 
 export default function DeviceStackedChart({ title, data, deviceFilters, timeRange, onTimeRangeChange }: DeviceStackedChartProps) {
   const { isDark } = useDarkMode();
+  const [showQoQ, setShowQoQ] = useState(false);
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
   const labelFill = isDark ? '#cbd5e1' : '#374151';
   const tooltipStyle = isDark
@@ -163,6 +164,18 @@ export default function DeviceStackedChart({ title, data, deviceFilters, timeRan
       {/* Header: title + time range selector */}
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">{title}</h3>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowQoQ((v) => !v)}
+            className={`rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+              showQoQ
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+            }`}
+          >
+            QoQ
+          </button>
+        </div>
         <div className="flex items-center gap-1">
           {TIME_PRESETS.map((preset) => (
             <button
@@ -341,21 +354,40 @@ export default function DeviceStackedChart({ title, data, deviceFilters, timeRan
             </thead>
             <tbody>
               {activeKeys.map((key, rowIdx) => (
-                <tr key={key} className={rowIdx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'}>
-                  <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: DEVICE_COLORS[key] }}>
-                    {DEVICE_LABELS[key]}
-                  </td>
-                  {filteredData.map((d) => (
-                    <td
-                      key={d.quarter}
-                      className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
-                        d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
-                      }`}
-                    >
-                      {(d[key] ?? 0).toLocaleString()}
+                <Fragment key={key}>
+                  <tr className={rowIdx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'}>
+                    <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: DEVICE_COLORS[key] }}>
+                      {DEVICE_LABELS[key]}
                     </td>
-                  ))}
-                </tr>
+                    {filteredData.map((d) => (
+                      <td
+                        key={d.quarter}
+                        className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
+                          d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        {(d[key] ?? 0).toLocaleString()}
+                      </td>
+                    ))}
+                  </tr>
+                  {showQoQ && (
+                    <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] whitespace-nowrap dark:border-gray-600" style={{ color: DEVICE_COLORS[key], opacity: 0.6 }}>QoQ</td>
+                      {filteredData.map((d, i) => {
+                        const cur = d[key] ?? 0;
+                        const prev = i > 0 ? (filteredData[i - 1][key] ?? 0) : null;
+                        const qoq = prev && prev > 0 ? ((cur - prev) / prev) * 100 : null;
+                        const sign = qoq !== null && qoq > 0 ? '+' : '';
+                        const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                        return (
+                          <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                            {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )}
+                </Fragment>
               ))}
               {/* Total row */}
               <tr className="bg-gray-100 dark:bg-gray-600 font-semibold">
@@ -376,6 +408,45 @@ export default function DeviceStackedChart({ title, data, deviceFilters, timeRan
                   );
                 })}
               </tr>
+              {/* Total QoQ */}
+              {showQoQ && (
+                <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                  {filteredData.map((d, i) => {
+                    const total = activeKeys.reduce((sum, key) => sum + (d[key] ?? 0), 0);
+                    const prevTotal = i > 0 ? activeKeys.reduce((sum, key) => sum + (filteredData[i - 1][key] ?? 0), 0) : null;
+                    const qoq = prevTotal && prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : null;
+                    const sign = qoq !== null && qoq > 0 ? '+' : '';
+                    const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                    return (
+                      <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                        {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              )}
+              {/* CAGR row (12Q only) */}
+              {timeRange === 12 && (() => {
+                const first = filteredData[0];
+                const last = filteredData[filteredData.length - 1];
+                const years = (filteredData.length - 1) / 4;
+                if (!first || !last || years <= 0) return null;
+                const firstTotal = activeKeys.reduce((sum, key) => sum + (first[key] ?? 0), 0);
+                const lastTotal = activeKeys.reduce((sum, key) => sum + (last[key] ?? 0), 0);
+                const cagr = firstTotal > 0 && lastTotal > 0 ? (Math.pow(lastTotal / firstTotal, 1 / years) - 1) * 100 : null;
+                return (
+                  <tr className="bg-blue-50/50 dark:bg-blue-900/20">
+                    <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
+                    <td
+                      colSpan={filteredData.length}
+                      className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400"
+                    >
+                      {cagr !== null ? `${cagr > 0 ? '+' : ''}${cagr.toFixed(1)}%` : '-'}
+                    </td>
+                  </tr>
+                );
+              })()}
             </tbody>
           </table>
         </div>

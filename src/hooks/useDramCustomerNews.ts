@@ -36,6 +36,7 @@ export function useDramCustomerNews(customerId: DramCustomerId | null) {
           queryKo: customer.newsQueryKo,
           queryEn: customer.newsQueryEn,
           companyName: customer.nameKo,
+          context: `${customer.nameKo} DRAM 고객사 - 해당 고객의 반도체/메모리 수요 및 웨이퍼 수급 영향`,
         });
         const res = await fetch(`/api/news?${params}`, {
           signal: controller.signal,

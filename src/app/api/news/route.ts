@@ -86,6 +86,7 @@ function buildSummaryCacheKey(companyName: string, articles: RssArticle[]): stri
 async function generateSummary(
   companyName: string,
   articles: RssArticle[],
+  context?: string,
 ): Promise<string | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
   if (articles.length === 0) return null;
@@ -106,31 +107,43 @@ async function generateSummary(
       .map((a, i) => `${i + 1}. [${a.source}] ${a.title}${a.publishedDate ? ` (${new Date(a.publishedDate).toLocaleDateString('ko-KR')})` : ''}`)
       .join('\n');
 
+    const contextInstruction = context
+      ? `\n\n★ 중요: 이 요약은 "${context}" 관점의 대시보드에 표시됩니다. 헤드라인은 반드시 해당 관점에서의 임팩트/영향까지 포함해야 합니다.\n예: 단순히 "AI 서버 ASIC 칩 출하량 3배 급증"이 아니라 "AI 서버 ASIC 3배 급증 → EPI 실리콘 웨이퍼 수요 대폭 확대"처럼 해당 도메인에 미치는 영향까지 헤드라인에 담아주세요.`
+      : '';
+
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 500,
+      max_tokens: 1200,
       messages: [
         {
           role: 'user',
-          content: `다음은 "${companyName}"에 대한 최근 6개월 이내 뉴스 기사 제목 목록입니다 (최신순 정렬).
+          content: `다음은 "${companyName}"에 대한 최근 뉴스 기사 제목 목록입니다.
 
-반도체/웨이퍼 산업 관점에서 핵심 동향을 주제별로 나누어 한국어로 요약해주세요.
+각 기사를 헤드라인 + 상세요약 형태로 정리해주세요.${contextInstruction}
+
+정렬 기준 (중요도순):
+1. 산업 영향력이 큰 기사 (시장 전체에 영향)
+2. 구체적 숫자가 있는 기사 (변화폭, 투자액, 성장률 등)
+3. 최신 기사
 
 형식 규칙:
-- 반드시 각 항목을 "- "로 시작하는 개조식으로 작성
-- 주제별로 하나의 항목으로 작성 (3~5개 항목)
-- 각 항목은 자연스러운 완결된 한국어 문장으로 작성 (문장 중간에 끊기지 않도록)
-- 각 항목 뒤에 출처 기사 번호를 [1], [2] 형식으로 표기. 여러 기사가 관련되면 [1][3] 처럼 복수 표기
-- "#" 헤더나 제목줄은 사용하지 마세요
+- 반드시 "- "로 시작
+- 정확히 4개 항목 (4개 초과 금지)
+- 모든 항목은 반드시 "헤드라인 >>> 상세요약 [출처번호]" 형태. >>> 구분자 필수!
+- 헤드라인: 최대 60자, 반드시 숫자/변화폭 포함, 해당 도메인 임팩트까지 포함
+- 상세요약: 3~5문장으로 배경/맥락/전망을 상세히 설명. 구체적 수치, 주요 기업명, 시장 전망 포함
+- 출처 번호: [1], [2] 형식. 여러 기사 관련시 [1][3] 복수 표기
+- "#" 헤더 사용 금지
+- ⚠️ 절대로 >>> 없이 헤드라인만 작성하지 마세요. 모든 항목에 >>> 뒤에 상세요약이 있어야 합니다.
 
 예시:
-- AI 컴퓨팅 수요 증가로 인한 메모리 병목 현상이 역사적 호황기를 견인 중. [3][4]
-- HBM이 실적 견인의 핵심 동력으로 작용하며, 1Q26 메모리 가격이 사상 최고 수준으로 오를 것으로 전망됨. [1][6]
+- 삼성전자 D램 가격 40% 인상, 메모리 공급 우위 강화 >>> 삼성전자와 SK하이닉스가 서버향 DDR5 수요 증가에 힘입어 D램 계약가를 전분기 대비 40% 인상했다. 메모리 3사 모두 감산 기조를 유지하며 공급 우위를 확보하는 전략이다. 이에 따라 웨이퍼 수급도 타이트해질 전망이며, 특히 HBM용 고순도 웨이퍼 수요가 급증하고 있다. [1][3]
+- TSMC CapEx $38B 역대 최대 → 파운드리 웨이퍼 수요 급증 >>> TSMC가 2025년 설비투자를 $38B으로 확대하며 역대 최대 규모를 기록했다. AI칩 수요 대응을 위한 CoWoS 패키징 캐파를 2배로 늘리는 것이 핵심이다. 이로 인해 300mm 웨이퍼 수요가 추가로 월 5만장 이상 증가할 것으로 예상된다. [2][5]
 
-기사 목록 (최신순):
+기사 목록:
 ${articleList}
 
-요약:`,
+헤드라인 요약:`,
         },
       ],
     });
@@ -152,8 +165,11 @@ ${articleList}
 }
 
 /** Build a stable cache key for the full news response (articles + summary) */
-function buildResponseCacheKey(queryKo: string, queryEn: string): string {
-  return `news-full_${queryKo}_${queryEn}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 200);
+function buildResponseCacheKey(queryKo: string, queryEn: string, context?: string): string {
+  const base = context
+    ? `news-full_${queryKo}_${queryEn}_${context}`
+    : `news-full_${queryKo}_${queryEn}`;
+  return base.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 200);
 }
 
 export async function GET(request: NextRequest) {
@@ -161,6 +177,7 @@ export async function GET(request: NextRequest) {
   const queryKo = searchParams.get('queryKo');
   const queryEn = searchParams.get('queryEn');
   const companyName = searchParams.get('companyName');
+  const context = searchParams.get('context');
 
   if (!queryKo || !queryEn) {
     return NextResponse.json(
@@ -170,7 +187,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Check full response cache first (24h TTL) — avoids RSS fetch + AI call
-  const responseCacheKey = buildResponseCacheKey(queryKo, queryEn);
+  const responseCacheKey = buildResponseCacheKey(queryKo, queryEn, context ?? undefined);
   const cachedResponse = await getCached<{ answer: string | null; articles: RssArticle[] }>(responseCacheKey);
   if (cachedResponse) {
     console.log(`[News] Full response cache hit for "${queryKo}"`);
@@ -188,6 +205,7 @@ export async function GET(request: NextRequest) {
     const answer = await generateSummary(
       companyName ?? queryKo,
       articles,
+      context ?? undefined,
     );
 
     // Cache full response for 24 hours (1 fetch per day per query)

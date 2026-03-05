@@ -26,6 +26,7 @@ interface Props {
   bitGrowthData: BitGrowthQuarterlyEntry[];
   quarterRange: 4 | 8 | 12;
   onQuarterRangeChange: (range: 4 | 8 | 12) => void;
+  customerType: 'memory' | 'foundry';
 }
 
 type QuarterRange = 4 | 8 | 12;
@@ -46,7 +47,7 @@ interface CombinedEntry {
 
 /** Source-specific multiplier for chart data differentiation */
 const SOURCE_FACTOR: Record<string, number> = {
-  Omdia: 1.0,
+  UBS: 1.0,
   TrendForce: 0.97,
 };
 
@@ -60,11 +61,29 @@ function getQuarterLabel(quarter: string): string {
   return match ? `${match[1]}Q` : quarter;
 }
 
-export default function ExternalComparison({ data, waferInOutData, bitGrowthData, quarterRange, onQuarterRangeChange }: Props) {
+export default function ExternalComparison({ data, waferInOutData, bitGrowthData, quarterRange, onQuarterRangeChange, customerType }: Props) {
+  // Foundry customers: show placeholder instead of wafer in/out data
+  if (customerType === 'foundry') {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-md dark:border-gray-700 dark:bg-gray-800">
+        <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-gray-100">Wafer In/Out</h3>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
+            <svg className="h-6 w-6 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-2.47 2.47a2.25 2.25 0 01-1.59.659H9.06a2.25 2.25 0 01-1.591-.659L5 14.5m14 0V17a2.25 2.25 0 01-2.25 2.25H7.25A2.25 2.25 0 015 17v-2.5" />
+            </svg>
+          </div>
+          <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">지표 선정중</p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">파운드리 고객사의 Wafer In/Out 및 Bit Growth 지표는 현재 선정 중입니다.</p>
+        </div>
+      </div>
+    );
+  }
+
   const { isDark } = useDarkMode();
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
   const gridStroke = isDark ? '#334155' : '#e5e7eb';
-  const [selectedSource, setSelectedSource] = useState<string>(data[0]?.source ?? 'Omdia');
+  const [selectedSource, setSelectedSource] = useState<string>(data[0]?.source ?? 'UBS');
 
   const factor = SOURCE_FACTOR[selectedSource] ?? 1.0;
 
@@ -381,6 +400,21 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
                   </td>
                 ))}
               </tr>
+              {/* Wafer In QoQ */}
+              <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                {filteredData.map((d, i) => {
+                  const prev = i > 0 ? filteredData[i - 1].waferIn : null;
+                  const qoq = prev && prev > 0 ? ((d.waferIn - prev) / prev) * 100 : null;
+                  const sign = qoq !== null && qoq > 0 ? '+' : '';
+                  const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                  return (
+                    <td key={d.quarter} className={`px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] dark:border-gray-600 ${color}`}>
+                      {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                    </td>
+                  );
+                })}
+              </tr>
               {/* Wafer Out */}
               <tr className="bg-gray-50 dark:bg-gray-700">
                 <td className="px-1.5 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: '#10b981' }}>
@@ -392,6 +426,21 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
                   </td>
                 ))}
               </tr>
+              {/* Wafer Out QoQ */}
+              <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                {filteredData.map((d, i) => {
+                  const prev = i > 0 ? filteredData[i - 1].waferOut : null;
+                  const qoq = prev && prev > 0 ? ((d.waferOut - prev) / prev) * 100 : null;
+                  const sign = qoq !== null && qoq > 0 ? '+' : '';
+                  const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                  return (
+                    <td key={d.quarter} className={`px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] dark:border-gray-600 ${color}`}>
+                      {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                    </td>
+                  );
+                })}
+              </tr>
               {/* Bit Growth */}
               <tr className="bg-white dark:bg-gray-800">
                 <td className="px-1.5 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: '#f59e0b' }}>
@@ -402,6 +451,21 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
                     {d.bitGrowth.toFixed(1)}%
                   </td>
                 ))}
+              </tr>
+              {/* Bit Growth delta vs previous quarter */}
+              <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] text-gray-400 whitespace-nowrap dark:border-gray-600">전분기比</td>
+                {filteredData.map((d, i) => {
+                  const prev = i > 0 ? filteredData[i - 1].bitGrowth : null;
+                  const delta = prev !== null ? d.bitGrowth - prev : null;
+                  const sign = delta !== null && delta > 0 ? '+' : '';
+                  const color = delta === null ? 'text-gray-300 dark:text-gray-600' : delta > 0 ? 'text-red-500' : delta < 0 ? 'text-blue-500' : 'text-gray-400';
+                  return (
+                    <td key={d.quarter} className={`px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] dark:border-gray-600 ${color}`}>
+                      {delta !== null ? `${sign}${delta.toFixed(1)}%p` : '-'}
+                    </td>
+                  );
+                })}
               </tr>
             </tbody>
           </table>

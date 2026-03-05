@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { parseAiBullets, renderWithRefs } from '@/lib/news-utils';
+import { parseAiBullets, CollapsibleBullet, SourceBadge } from '@/lib/news-utils';
+import type { NewsArticleRef } from '@/lib/news-utils';
 
 interface Article {
   title: string;
@@ -49,9 +50,22 @@ export default function CustomerNewsPanel({
   if (loading) {
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div className="flex items-center gap-2">
-          <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
-          <p className="text-xs text-gray-400">뉴스 분석 중...</p>
+        <div
+          className="rounded-lg border-l-4 bg-gradient-to-r from-gray-50 to-white p-3 dark:from-gray-700/50 dark:to-gray-800"
+          style={{ borderLeftColor: accentColor }}
+        >
+          <div className="mb-2 flex items-center gap-1.5">
+            <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300" style={{ borderTopColor: accentColor }} />
+            <span className="text-xs font-bold" style={{ color: accentColor }}>
+              AI 기사 요약{cleanLabel ? ` (${cleanLabel})` : ''}
+            </span>
+          </div>
+          <div className="animate-pulse space-y-2">
+            <div className="h-3.5 w-5/6 rounded bg-gray-200 dark:bg-gray-600" />
+            <div className="h-3.5 w-3/4 rounded bg-gray-200 dark:bg-gray-600" />
+            <div className="h-3.5 w-4/6 rounded bg-gray-200 dark:bg-gray-600" />
+          </div>
+          <p className="mt-2 text-[11px] text-gray-400">기사를 수집하고 AI 요약을 생성하고 있습니다...</p>
         </div>
       </div>
     );
@@ -88,12 +102,9 @@ export default function CustomerNewsPanel({
               AI 기사 요약{cleanLabel ? ` (${cleanLabel})` : ''}
             </span>
           </div>
-          <ul className="space-y-1 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+          <ul className="space-y-1.5 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
             {bullets.map((bullet, idx) => (
-              <li key={idx} className="flex gap-1.5">
-                <span className="mt-0.5 shrink-0 text-gray-400">•</span>
-                <span>{renderWithRefs(bullet, list, accentColor)}</span>
-              </li>
+              <CollapsibleBullet key={idx} text={bullet} articles={list as NewsArticleRef[]} accentColor={accentColor} />
             ))}
           </ul>
         </div>
@@ -104,7 +115,7 @@ export default function CustomerNewsPanel({
         <div className={bullets.length > 0 ? 'mt-2' : ''}>
           <button
             onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-semibold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+            className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[12px] font-semibold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
           >
             <svg
               className={`h-3 w-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
@@ -129,19 +140,17 @@ export default function CustomerNewsPanel({
                   className="group flex items-start gap-2 rounded-lg border border-gray-100 bg-white p-2.5 transition-all hover:border-gray-200 hover:shadow-sm dark:border-gray-600 dark:bg-gray-700/50 dark:hover:border-gray-500"
                 >
                   <span
-                    className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
+                    className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
                     style={{ backgroundColor: accentColor }}
                   >
                     {i + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-xs font-semibold leading-snug text-gray-800 group-hover:text-blue-600 dark:text-gray-100 dark:group-hover:text-blue-400">
+                    <h4 className="text-[13px] font-semibold leading-snug text-gray-800 group-hover:text-blue-600 dark:text-gray-100 dark:group-hover:text-blue-400">
                       {article.title}
                     </h4>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-gray-400 dark:text-gray-500">
-                      <span className="font-medium text-gray-500 dark:text-gray-400">
-                        {article.source}
-                      </span>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+                      <SourceBadge source={article.source} size="xs" />
                       {article.publishedDate && (
                         <>
                           <span className="text-gray-300 dark:text-gray-600">|</span>

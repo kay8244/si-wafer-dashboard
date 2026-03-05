@@ -29,6 +29,7 @@ export function useFoundryMetricNews(metricKey: FoundryMetricKey | null) {
           queryKo: metric.queryKo,
           queryEn: metric.queryEn,
           companyName: metric.labelKo,
+          context: `${metric.labelKo} 파운드리 지표 - 파운드리 산업의 웨이퍼 수급 및 생산 영향`,
         });
         const res = await fetch(`/api/news?${params}`, {
           signal: controller.signal,

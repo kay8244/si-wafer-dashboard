@@ -36,6 +36,7 @@ export function useCompanyNews(companyId: CompanyId | null) {
           queryKo: company.newsQueryKo,
           queryEn: company.newsQueryEn,
           companyName: company.nameKo,
+          context: `${company.nameKo} 기업 분석 - 해당 기업의 반도체 사업 및 웨이퍼 수급 영향`,
         });
         const res = await fetch(`/api/news?${params}`, {
           signal: controller.signal,

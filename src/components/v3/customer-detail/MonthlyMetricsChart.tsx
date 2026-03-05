@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import {
   ComposedChart,
   Bar,
@@ -20,9 +20,19 @@ export type MetricKey = 'waferInput' | 'purchaseVolume' | 'inventoryMonths' | 'c
 
 interface Props {
   data: MonthlyMetricData[];
+  prevVersionData?: MonthlyMetricData[];
+  versionLabel?: string;
+  prevVersionLabel?: string;
+  customerType?: 'memory' | 'foundry';
   quarterRange: 4 | 8 | 12;
   onQuarterRangeChange: (range: 4 | 8 | 12) => void;
 }
+
+const LIGHT_COLORS: Record<string, string> = {
+  waferInput: '#93C5FD',
+  purchaseVolume: '#6EE7B7',
+  capa: '#C4B5FD',
+};
 
 const BAR_METRICS: { key: MetricKey; label: string; color: string; unit: string }[] = [
   { key: 'waferInput', label: '투입량', color: '#3B82F6', unit: 'Km²' },
@@ -36,6 +46,9 @@ const LINE_METRICS: { key: MetricKey; label: string; color: string; unit: string
 ];
 
 const ALL_METRICS = [...BAR_METRICS, ...LINE_METRICS];
+
+/** Only these metrics get DRAM/NAND split (구매량/재고수준 excluded) */
+const SPLITTABLE_KEYS = new Set<MetricKey>(['waferInput', 'capa', 'utilization']);
 
 type QuarterRange = 4 | 8 | 12;
 type TimeGranularity = 'monthly' | 'quarterly' | 'yearly';
@@ -53,8 +66,9 @@ function aggregateQuarterly(data: MonthlyMetricData[]): MonthlyMetricData[] {
     if (chunk.length === 0) continue;
     const label = chunk[0].month;
     const sum = (key: keyof MonthlyMetricData) =>
-      chunk.reduce((acc, d) => acc + (d[key] as number), 0);
+      chunk.reduce((acc, d) => acc + ((d[key] as number) ?? 0), 0);
     const avg = (key: keyof MonthlyMetricData) => +(sum(key) / chunk.length).toFixed(1);
+    const hasDramRatio = chunk[0].dramRatio !== undefined;
     result.push({
       month: label,
       waferInput: +(sum('waferInput')).toFixed(1),
@@ -63,6 +77,7 @@ function aggregateQuarterly(data: MonthlyMetricData[]): MonthlyMetricData[] {
       utilization: avg('utilization'),
       inventoryLevel: avg('inventoryLevel'),
       capa: +(sum('capa')).toFixed(1),
+      ...(hasDramRatio ? { dramRatio: +((chunk.reduce((a, d) => a + (d.dramRatio ?? 0), 0)) / chunk.length).toFixed(3) } : {}),
     });
   }
   return result;
@@ -77,8 +92,9 @@ function aggregateYearly(data: MonthlyMetricData[]): MonthlyMetricData[] {
   }
   return Object.entries(map).map(([year, chunk]) => {
     const sum = (key: keyof MonthlyMetricData) =>
-      chunk.reduce((acc, d) => acc + (d[key] as number), 0);
+      chunk.reduce((acc, d) => acc + ((d[key] as number) ?? 0), 0);
     const avg = (key: keyof MonthlyMetricData) => +(sum(key) / chunk.length).toFixed(1);
+    const hasDramRatio = chunk[0].dramRatio !== undefined;
     return {
       month: `20${year}`,
       waferInput: +(sum('waferInput')).toFixed(1),
@@ -87,6 +103,7 @@ function aggregateYearly(data: MonthlyMetricData[]): MonthlyMetricData[] {
       utilization: avg('utilization'),
       inventoryLevel: avg('inventoryLevel'),
       capa: +(sum('capa')).toFixed(1),
+      ...(hasDramRatio ? { dramRatio: +((chunk.reduce((a, d) => a + (d.dramRatio ?? 0), 0)) / chunk.length).toFixed(3) } : {}),
     };
   });
 }
@@ -108,14 +125,41 @@ function getDisplayLabel(month: string, gran: TimeGranularity): string {
   return `${m}월`;
 }
 
-export default function MonthlyMetricsChart({ data, quarterRange, onQuarterRangeChange }: Props) {
+/** Compute period-over-period growth rate */
+function computeGrowth(arr: MonthlyMetricData[], key: MetricKey, idx: number, offset: number): number | null {
+  if (offset <= 0 || idx - offset < 0) return null;
+  const curr = arr[idx][key] as number;
+  const prev = arr[idx - offset][key] as number;
+  if (!prev || prev === 0) return null;
+  return ((curr - prev) / prev) * 100;
+}
+
+function formatGrowth(v: number | null): { text: string; color: string } {
+  if (v === null) return { text: '-', color: 'text-gray-300 dark:text-gray-600' };
+  const sign = v > 0 ? '+' : '';
+  return {
+    text: `${sign}${v.toFixed(1)}%`,
+    color: v > 0 ? 'text-red-500' : v < 0 ? 'text-blue-500' : 'text-gray-400',
+  };
+}
+
+export default function MonthlyMetricsChart({
+  data,
+  prevVersionData,
+  versionLabel = '최신 집계',
+  prevVersionLabel = '이전 집계',
+  customerType,
+  quarterRange,
+  onQuarterRangeChange,
+}: Props) {
   const { isDark } = useDarkMode();
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
   const gridStroke = isDark ? '#334155' : '#e5e7eb';
   const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>([
     'waferInput', 'inventoryMonths',
   ]);
-  const [granularity, setGranularity] = useState<TimeGranularity>('monthly');
+  const [granularity, setGranularity] = useState<TimeGranularity>('quarterly');
+  const [showVersionCompare, setShowVersionCompare] = useState(false);
 
   function toggleMetric(key: MetricKey) {
     setSelectedMetrics((prev) =>
@@ -123,16 +167,32 @@ export default function MonthlyMetricsChart({ data, quarterRange, onQuarterRange
     );
   }
 
-  // 4Q = 12 months, 8Q = 24 months, 12Q = 36 months
+  // Aggregate data — center around current month
   const monthCount = quarterRange * 3;
-  const sliced = data.slice(-Math.min(monthCount, data.length));
-
+  const currentMonthSliceIdx = useMemo(() => {
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const target = `${yy}.${mm}`;
+    const idx = data.findIndex((d) => d.month >= target);
+    return idx >= 0 ? idx : data.length - 1;
+  }, [data]);
+  const sliceStart = Math.max(0, currentMonthSliceIdx - Math.floor(monthCount / 2));
+  const sliceEnd = Math.min(data.length, sliceStart + monthCount);
+  const adjustedStart = Math.max(0, sliceEnd - monthCount);
+  const sliced = data.slice(adjustedStart, sliceEnd);
   const aggregated =
     granularity === 'quarterly'
       ? aggregateQuarterly(sliced)
       : granularity === 'yearly'
         ? aggregateYearly(sliced)
         : sliced;
+
+  // Prev version aggregation
+  const prevSliced = prevVersionData?.slice(adjustedStart, sliceEnd);
+  const prevAggregated = prevSliced
+    ? (granularity === 'quarterly' ? aggregateQuarterly(prevSliced) : granularity === 'yearly' ? aggregateYearly(prevSliced) : prevSliced)
+    : null;
 
   const enrichedData = useMemo(
     () =>
@@ -143,13 +203,71 @@ export default function MonthlyMetricsChart({ data, quarterRange, onQuarterRange
     [aggregated],
   );
 
-  // "현재" marker: 1 quarter before end (last 3 months = future estimate quarter)
-  const currentIdx = enrichedData.length > 0
-    ? (granularity === 'monthly'
-      ? Math.max(0, enrichedData.length - 4)   // 3 months from end
-      : Math.max(0, enrichedData.length - 2))   // 1 entry from end in quarterly/yearly
-    : -1;
-  const currentMonth = currentIdx >= 0 ? enrichedData[currentIdx]?.month : undefined;
+  const prevEnrichedData = useMemo(
+    () =>
+      prevAggregated?.map((d) => {
+        const derivedUtilization = d.capa > 0 ? +((d.waferInput / d.capa) * 100).toFixed(1) : d.utilization;
+        return { ...d, utilization: derivedUtilization };
+      }) ?? null,
+    [prevAggregated],
+  );
+
+  const isMemory = customerType === 'memory';
+  const hasDramRatio = enrichedData.some(d => d.dramRatio !== undefined);
+  const canSplit = isMemory && hasDramRatio;
+  const hasVersionData = !!prevVersionData && prevVersionData.length > 0;
+
+  // Chart data with split and version fields
+  const chartData = useMemo(() => {
+    return enrichedData.map((d, i) => {
+      const entry: Record<string, unknown> = { ...d };
+
+      // DRAM/NAND split fields (only splittable bar metrics)
+      if (canSplit && d.dramRatio !== undefined) {
+        const r = d.dramRatio;
+        for (const m of BAR_METRICS) {
+          if (!SPLITTABLE_KEYS.has(m.key)) continue;
+          const val = d[m.key] as number;
+          entry[`dram_${m.key}`] = +(val * r).toFixed(1);
+          entry[`nand_${m.key}`] = +(val * (1 - r)).toFixed(1);
+        }
+      }
+
+      // Previous version fields
+      if (showVersionCompare && prevEnrichedData && prevEnrichedData[i]) {
+        const prev = prevEnrichedData[i];
+        for (const m of ALL_METRICS) {
+          entry[`prev_${m.key}`] = prev[m.key];
+        }
+      }
+
+      return entry;
+    });
+  }, [enrichedData, prevEnrichedData, canSplit, showVersionCompare]);
+
+  // Dynamic "현재" marker based on actual current date
+  const currentMarkerMonth = useMemo(() => {
+    if (enrichedData.length === 0) return undefined;
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+
+    let target: string;
+    if (granularity === 'yearly') {
+      target = `20${yy}`;
+    } else if (granularity === 'quarterly') {
+      const lastMonthOfQ = Math.ceil((now.getMonth() + 1) / 3) * 3;
+      target = `${yy}.${String(lastMonthOfQ).padStart(2, '0')}`;
+    } else {
+      target = `${yy}.${mm}`;
+    }
+
+    let best: string | undefined;
+    for (const d of enrichedData) {
+      if (d.month <= target) best = d.month;
+    }
+    return best ?? enrichedData[enrichedData.length - 1]?.month;
+  }, [enrichedData, granularity]);
 
   const activeBarMetrics = BAR_METRICS.filter((m) => selectedMetrics.includes(m.key));
   const activeLineMetrics = LINE_METRICS.filter((m) => selectedMetrics.includes(m.key));
@@ -170,12 +288,42 @@ export default function MonthlyMetricsChart({ data, quarterRange, onQuarterRange
     return groups;
   }, [enrichedData]);
 
+  // Growth offsets: only show the matching rate per granularity
+  const growthOffsets = useMemo(() => {
+    switch (granularity) {
+      case 'monthly': return { mom: 1, qoq: 0, yoy: 0 };
+      case 'quarterly': return { mom: 0, qoq: 1, yoy: 0 };
+      case 'yearly': return { mom: 0, qoq: 0, yoy: 1 };
+    }
+  }, [granularity]);
+
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">
           Wafer 주요 지표 Chart
         </h3>
+        {hasVersionData && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowVersionCompare(!showVersionCompare)}
+              className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors ${
+                showVersionCompare
+                  ? 'bg-orange-500 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
+              }`}
+            >
+              전월조사 비교
+            </button>
+            {showVersionCompare && (
+              <span className="text-[10px] text-gray-400">
+                <span className="font-semibold text-gray-600 dark:text-gray-300">{versionLabel}</span>
+                {' vs '}
+                <span className="font-semibold text-orange-400">{prevVersionLabel}</span>
+              </span>
+            )}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-1">
           {ALL_METRICS.map((opt) => (
             <button
@@ -192,7 +340,7 @@ export default function MonthlyMetricsChart({ data, quarterRange, onQuarterRange
             </button>
           ))}
 
-          {/* Period selector — 4Q/8Q/12Q */}
+          {/* Period selector */}
           <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-600">
             {TIME_PRESETS.map((preset) => (
               <button
@@ -233,7 +381,7 @@ export default function MonthlyMetricsChart({ data, quarterRange, onQuarterRange
       </div>
 
       <ResponsiveContainer width="100%" height={240}>
-        <ComposedChart data={enrichedData} margin={{ top: 20, right: 8, bottom: 0, left: -8 }}>
+        <ComposedChart data={chartData} margin={{ top: 20, right: 8, bottom: 0, left: -8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
           <XAxis
             dataKey="month"
@@ -241,14 +389,12 @@ export default function MonthlyMetricsChart({ data, quarterRange, onQuarterRange
             axisLine={false}
             tickLine={false}
           />
-          {/* Left Y-axis for bar metrics (Km²) */}
           <YAxis
             yAxisId="left"
             tick={{ fontSize: 11, fill: tickFill }}
             axisLine={false}
             tickLine={false}
           />
-          {/* Right Y-axis for line metrics (% / 개월) */}
           {activeLineMetrics.length > 0 && (
             <YAxis
               yAxisId="right"
@@ -268,10 +414,10 @@ export default function MonthlyMetricsChart({ data, quarterRange, onQuarterRange
           <Legend wrapperStyle={{ fontSize: 11 }} />
 
           {/* 현재 marker */}
-          {currentMonth && (
+          {currentMarkerMonth && (
             <ReferenceLine
               yAxisId="left"
-              x={currentMonth}
+              x={currentMarkerMonth}
               stroke={isDark ? '#fbbf24' : '#dc2626'}
               strokeDasharray="4 4"
               strokeWidth={1.5}
@@ -305,21 +451,80 @@ export default function MonthlyMetricsChart({ data, quarterRange, onQuarterRange
             />
           )}
 
-          {/* Bar metrics — left Y axis */}
-          {activeBarMetrics.map((opt) => (
+          {/* Previous version bars (behind current, lighter) */}
+          {showVersionCompare && activeBarMetrics.map((opt) => (
             <Bar
-              key={opt.key}
+              key={`prev_${opt.key}`}
               yAxisId="left"
-              dataKey={opt.key}
-              name={`${opt.label} (${opt.unit})`}
+              dataKey={`prev_${opt.key}`}
+              name={`${prevVersionLabel} ${opt.label}`}
               fill={opt.color}
-              opacity={0.8}
-              barSize={16}
+              opacity={0.25}
+              barSize={12}
               radius={[2, 2, 0, 0]}
             />
           ))}
 
-          {/* Line metrics — right Y axis */}
+          {/* Bar metrics — split only for splittable metrics */}
+          {activeBarMetrics.map((opt) => {
+            const isSplittable = canSplit && SPLITTABLE_KEYS.has(opt.key);
+            if (isSplittable) {
+              return (
+                <Fragment key={opt.key}>
+                  <Bar
+                    stackId={opt.key}
+                    yAxisId="left"
+                    dataKey={`dram_${opt.key}`}
+                    name={`DRAM ${opt.label}`}
+                    fill={opt.color}
+                    opacity={0.9}
+                    barSize={16}
+                    radius={[0, 0, 0, 0]}
+                  />
+                  <Bar
+                    stackId={opt.key}
+                    yAxisId="left"
+                    dataKey={`nand_${opt.key}`}
+                    name={`NAND ${opt.label}`}
+                    fill={LIGHT_COLORS[opt.key] ?? opt.color}
+                    opacity={0.9}
+                    barSize={16}
+                    radius={[2, 2, 0, 0]}
+                  />
+                </Fragment>
+              );
+            }
+            return (
+              <Bar
+                key={opt.key}
+                yAxisId="left"
+                dataKey={opt.key}
+                name={`${opt.label} (${opt.unit})`}
+                fill={opt.color}
+                opacity={0.8}
+                barSize={16}
+                radius={[2, 2, 0, 0]}
+              />
+            );
+          })}
+
+          {/* Previous version lines (dashed) */}
+          {showVersionCompare && activeLineMetrics.map((opt) => (
+            <Line
+              key={`prev_${opt.key}`}
+              yAxisId="right"
+              type="monotone"
+              dataKey={`prev_${opt.key}`}
+              name={`${prevVersionLabel} ${opt.label}`}
+              stroke={opt.color}
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+              dot={false}
+              opacity={0.4}
+            />
+          ))}
+
+          {/* Line metrics */}
           {activeLineMetrics.map((opt) => (
             <Line
               key={opt.key}
@@ -341,12 +546,12 @@ export default function MonthlyMetricsChart({ data, quarterRange, onQuarterRange
         </p>
       )}
 
-      {/* Data table — syncs with chart (year-merged headers) */}
+      {/* Data table with MoM/QoQ/YoY sub-rows */}
       {enrichedData.length > 0 && activeMetrics.length > 0 && (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
-              {/* Year row with colspan */}
+              {/* Year row */}
               <tr className="bg-gray-100 dark:bg-gray-700">
                 <th
                   rowSpan={2}
@@ -377,27 +582,162 @@ export default function MonthlyMetricsChart({ data, quarterRange, onQuarterRange
               </tr>
             </thead>
             <tbody>
-              {activeMetrics.map((metric, rowIdx) => (
-                <tr
-                  key={metric.key}
-                  className={rowIdx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'}
-                >
-                  <td
-                    className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600"
-                    style={{ color: metric.color }}
-                  >
-                    {metric.label}
-                  </td>
-                  {enrichedData.map((d) => (
-                    <td
-                      key={d.month}
-                      className="px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap text-gray-700 dark:border-gray-600 dark:text-gray-300"
-                    >
-                      {(d[metric.key] as number).toLocaleString(undefined, { maximumFractionDigits: 1 })}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {activeMetrics.map((metric, rowIdx) => {
+                return (
+                  <Fragment key={metric.key}>
+                    {/* Actual value row */}
+                    <tr className={rowIdx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'}>
+                      <td
+                        className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600"
+                        style={{ color: metric.color }}
+                      >
+                        {metric.label}
+                      </td>
+                      {enrichedData.map((d) => (
+                        <td
+                          key={d.month}
+                          className="px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                        >
+                          {(d[metric.key] as number).toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                        </td>
+                      ))}
+                    </tr>
+
+                    {/* Previous version row */}
+                    {showVersionCompare && prevEnrichedData && (
+                      <tr className="bg-orange-50/50 dark:bg-orange-900/10">
+                        <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-medium whitespace-nowrap text-orange-400 dark:border-gray-600">
+                          {prevVersionLabel}
+                        </td>
+                        {prevEnrichedData.map((d) => (
+                          <td
+                            key={d.month}
+                            className="px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] text-orange-400 dark:border-gray-600"
+                          >
+                            {(d[metric.key] as number).toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                          </td>
+                        ))}
+                      </tr>
+                    )}
+
+                    {/* Difference row (current - previous) */}
+                    {showVersionCompare && prevEnrichedData && (
+                      <tr className="bg-yellow-50/50 dark:bg-yellow-900/10">
+                        <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-medium whitespace-nowrap text-amber-600 dark:border-gray-600 dark:text-amber-400">
+                          차이
+                        </td>
+                        {enrichedData.map((d, i) => {
+                          const curr = d[metric.key] as number;
+                          const prev = prevEnrichedData[i]?.[metric.key] as number | undefined;
+                          if (prev === undefined) return <td key={d.month} className="px-1.5 py-0.5 border border-gray-200 text-right text-[10px] text-gray-300 dark:border-gray-600">-</td>;
+                          const diff = curr - prev;
+                          const sign = diff > 0 ? '+' : '';
+                          const color = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-blue-500' : 'text-gray-400';
+                          return (
+                            <td key={d.month} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                              {sign}{diff.toFixed(1)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    )}
+
+                    {/* DRAM/NAND split rows */}
+                    {canSplit && SPLITTABLE_KEYS.has(metric.key) && (
+                      <>
+                        <tr className="bg-blue-50/30 dark:bg-blue-900/10">
+                          <td
+                            className="pl-4 pr-2 py-0.5 border border-gray-200 text-[10px] font-medium whitespace-nowrap dark:border-gray-600"
+                            style={{ color: metric.color }}
+                          >
+                            DRAM
+                          </td>
+                          {enrichedData.map((d) => {
+                            const ratio = d.dramRatio ?? 0.5;
+                            const val = (d[metric.key] as number) * ratio;
+                            return (
+                              <td key={d.month} className="px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                                {val.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                        <tr className="bg-purple-50/30 dark:bg-purple-900/10">
+                          <td
+                            className="pl-4 pr-2 py-0.5 border border-gray-200 text-[10px] font-medium whitespace-nowrap dark:border-gray-600"
+                            style={{ color: LIGHT_COLORS[metric.key] ?? metric.color }}
+                          >
+                            NAND
+                          </td>
+                          {enrichedData.map((d) => {
+                            const ratio = d.dramRatio ?? 0.5;
+                            const val = (d[metric.key] as number) * (1 - ratio);
+                            return (
+                              <td key={d.month} className="px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                                {val.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      </>
+                    )}
+
+                    {/* MoM row */}
+                    {growthOffsets.mom > 0 && (
+                      <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                        <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">
+                          MoM
+                        </td>
+                        {enrichedData.map((d, i) => {
+                          const g = computeGrowth(enrichedData, metric.key, i, growthOffsets.mom);
+                          const { text, color } = formatGrowth(g);
+                          return (
+                            <td key={d.month} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                              {text}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    )}
+
+                    {/* QoQ row */}
+                    {growthOffsets.qoq > 0 && (
+                      <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                        <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">
+                          QoQ
+                        </td>
+                        {enrichedData.map((d, i) => {
+                          const g = computeGrowth(enrichedData, metric.key, i, growthOffsets.qoq);
+                          const { text, color } = formatGrowth(g);
+                          return (
+                            <td key={d.month} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                              {text}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    )}
+
+                    {/* YoY row */}
+                    {growthOffsets.yoy > 0 && (
+                      <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                        <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">
+                          YoY
+                        </td>
+                        {enrichedData.map((d, i) => {
+                          const g = computeGrowth(enrichedData, metric.key, i, growthOffsets.yoy);
+                          const { text, color } = formatGrowth(g);
+                          return (
+                            <td key={d.month} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                              {text}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

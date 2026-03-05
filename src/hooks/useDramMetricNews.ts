@@ -29,6 +29,7 @@ export function useDramMetricNews(metricKey: DramMetricKey | null) {
           queryKo: metric.queryKo,
           queryEn: metric.queryEn,
           companyName: metric.labelKo,
+          context: `${metric.labelKo} DRAM 지표 - DRAM 산업의 웨이퍼 수급 및 메모리 시장 영향`,
         });
         const res = await fetch(`/api/news?${params}`, {
           signal: controller.signal,

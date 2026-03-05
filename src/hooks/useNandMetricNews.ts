@@ -29,6 +29,7 @@ export function useNandMetricNews(metricKey: NandMetricKey | null) {
           queryKo: metric.queryKo,
           queryEn: metric.queryEn,
           companyName: metric.labelKo,
+          context: `${metric.labelKo} NAND 지표 - NAND 산업의 웨이퍼 수급 및 생산 영향`,
         });
         const res = await fetch(`/api/news?${params}`, {
           signal: controller.signal,

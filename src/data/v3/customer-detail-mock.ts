@@ -2,6 +2,7 @@ import type { CustomerExecutive, CustomerDetailId, MonthlyMetricData, Configurab
 
 export const CUSTOMER_LIST: { id: CustomerDetailId; label: string; type: 'memory' | 'foundry' | 'aggregate'; subLabel?: string }[] = [
   { id: 'Total_DRAM_NAND', label: 'Total DRAM/NAND', type: 'aggregate' },
+  { id: 'Total_Foundry', label: 'Total Foundry', type: 'aggregate' },
   { id: 'SEC', label: 'SEC', type: 'memory', subLabel: 'Prime(메모리)' },
   { id: 'SEC_Foundry', label: 'SEC', type: 'foundry', subLabel: 'EPI(파운드리)' },
   { id: 'SKHynix', label: 'SKHY', type: 'memory', subLabel: 'Prime(메모리)' },
@@ -36,7 +37,7 @@ function genWaferInput(base: number) {
 // Generate 36 months of metric data (supports 4Q/8Q/12Q time ranges)
 function genMonthlyMetrics(baseInput: number, basePurchase: number, baseInventory: number, baseUtil: number, baseInvLevel: number): MonthlyMetricData[] {
   const months: MonthlyMetricData[] = [];
-  const MONTH_COUNT = 39;
+  const MONTH_COUNT = 51; // March 2023 to May 2027 (~4 years, covers current + 1 year ahead)
   for (let i = 0; i < MONTH_COUNT; i++) {
     const totalMonth = 3 + i; // Start from March 2023
     const year = 23 + Math.floor((totalMonth - 1) / 12);
@@ -78,7 +79,7 @@ function genConfigurableKpis(
 }
 
 function genWaferInOutQuarterly(baseIn: number, baseOut: number): WaferInOutQuarterlyEntry[] {
-  const qs = ["Q1'23","Q2'23","Q3'23","Q4'23","Q1'24","Q2'24","Q3'24","Q4'24","Q1'25","Q2'25","Q3'25","Q4'25","Q1'26(E)","Q2'26(E)"];
+  const qs = ["Q1'23","Q2'23","Q3'23","Q4'23","Q1'24","Q2'24","Q3'24","Q4'24","Q1'25","Q2'25","Q3'25","Q4'25","Q1'26(E)","Q2'26(E)","Q3'26(E)","Q4'26(E)","Q1'27(E)","Q2'27(E)"];
   return qs.map((q, i) => {
     const growth = 1 + i * 0.018;
     const seasonal = 1 + 0.1 * Math.sin((i / 4) * Math.PI * 2);
@@ -92,7 +93,7 @@ function genWaferInOutQuarterly(baseIn: number, baseOut: number): WaferInOutQuar
 }
 
 function genBitGrowthQuarterly(baseGrowth: number): BitGrowthQuarterlyEntry[] {
-  const qs = ["Q1'23","Q2'23","Q3'23","Q4'23","Q1'24","Q2'24","Q3'24","Q4'24","Q1'25","Q2'25","Q3'25","Q4'25","Q1'26(E)","Q2'26(E)"];
+  const qs = ["Q1'23","Q2'23","Q3'23","Q4'23","Q1'24","Q2'24","Q3'24","Q4'24","Q1'25","Q2'25","Q3'25","Q4'25","Q1'26(E)","Q2'26(E)","Q3'26(E)","Q4'26(E)","Q1'27(E)","Q2'27(E)"];
   return qs.map((q, i) => ({
     quarter: q,
     growth: +(baseGrowth + (seededValue(i * 13 + baseGrowth * 10) - 0.5) * 8 + i * 0.5).toFixed(1),
@@ -154,7 +155,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { label: '기관 공폐', internal: 0.3, external: 0.5 },
     ],
     externalComparison: [
-      { source: 'Omdia', waferBitOut: '12.5B GB', bitGrowth: '+8.2%', gap: '3.2%' },
+      { source: 'UBS', waferBitOut: '12.5B GB', bitGrowth: '+8.2%', gap: '3.2%' },
       { source: 'TrendForce', waferBitOut: '12.1B GB', bitGrowth: '+7.8%', gap: '6.5%' },
     ],
     news: [
@@ -203,7 +204,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { label: '기관 공폐', internal: 0.2, external: 0.4 },
     ],
     externalComparison: [
-      { source: 'Omdia', waferBitOut: '14.2B GB', bitGrowth: '+12.5%', gap: '2.1%' },
+      { source: 'UBS', waferBitOut: '14.2B GB', bitGrowth: '+12.5%', gap: '2.1%' },
       { source: 'TrendForce', waferBitOut: '13.8B GB', bitGrowth: '+11.8%', gap: '5.0%' },
     ],
     news: [
@@ -252,7 +253,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { label: '기관 공폐', internal: 0.4, external: 0.6 },
     ],
     externalComparison: [
-      { source: 'Omdia', waferBitOut: '9.8B GB', bitGrowth: '+6.5%', gap: '4.8%' },
+      { source: 'UBS', waferBitOut: '9.8B GB', bitGrowth: '+6.5%', gap: '4.8%' },
       { source: 'TrendForce', waferBitOut: '9.5B GB', bitGrowth: '+5.9%', gap: '7.9%' },
     ],
     news: [
@@ -299,7 +300,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { label: '기관 공폐', internal: 0.5, external: 0.7 },
     ],
     externalComparison: [
-      { source: 'Omdia', waferBitOut: '-', bitGrowth: '-', gap: '-' },
+      { source: 'UBS', waferBitOut: '-', bitGrowth: '-', gap: '-' },
       { source: 'TrendForce', waferBitOut: '-', bitGrowth: '-', gap: '-' },
     ],
     news: [
@@ -349,7 +350,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { label: '기관 공폐', internal: 0.1, external: 0.3 },
     ],
     externalComparison: [
-      { source: 'Omdia', waferBitOut: '-', bitGrowth: '-', gap: '-' },
+      { source: 'UBS', waferBitOut: '-', bitGrowth: '-', gap: '-' },
       { source: 'TrendForce', waferBitOut: '-', bitGrowth: '-', gap: '-' },
     ],
     news: [
@@ -370,7 +371,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
   },
   SMC: {
     customerId: 'SMC',
-    label: 'SMC',
+    label: 'SMIC',
     type: 'foundry',
     newsQueryKo: 'SMIC 파운드리 반도체',
     newsQueryEn: 'SMIC foundry semiconductor',
@@ -400,7 +401,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { label: '기관 공폐', internal: 0.3, external: 0.5 },
     ],
     externalComparison: [
-      { source: 'Omdia', waferBitOut: '-', bitGrowth: '-', gap: '-' },
+      { source: 'UBS', waferBitOut: '-', bitGrowth: '-', gap: '-' },
       { source: 'TrendForce', waferBitOut: '-', bitGrowth: '-', gap: '-' },
     ],
     news: [
@@ -449,7 +450,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { label: '기관 공폐', internal: 0.2, external: 0.4 },
     ],
     externalComparison: [
-      { source: 'Omdia', waferBitOut: '-', bitGrowth: '-', gap: '-' },
+      { source: 'UBS', waferBitOut: '-', bitGrowth: '-', gap: '-' },
       { source: 'TrendForce', waferBitOut: '-', bitGrowth: '-', gap: '-' },
     ],
     news: [
@@ -496,7 +497,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { label: '기관 공폐', internal: 0.3, external: 0.5 },
     ],
     externalComparison: [
-      { source: 'Omdia', waferBitOut: '36.5B GB', bitGrowth: '+9.1%', gap: '3.5%' },
+      { source: 'UBS', waferBitOut: '36.5B GB', bitGrowth: '+9.1%', gap: '3.5%' },
       { source: 'TrendForce', waferBitOut: '35.4B GB', bitGrowth: '+8.5%', gap: '6.6%' },
     ],
     news: [
@@ -543,7 +544,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { label: '기관 공폐', internal: 0.3, external: 0.5 },
     ],
     externalComparison: [
-      { source: 'Omdia', waferBitOut: '8.2B GB', bitGrowth: '+5.8%', gap: '4.2%' },
+      { source: 'UBS', waferBitOut: '8.2B GB', bitGrowth: '+5.8%', gap: '4.2%' },
       { source: 'TrendForce', waferBitOut: '7.9B GB', bitGrowth: '+5.2%', gap: '7.1%' },
     ],
     news: [
@@ -590,7 +591,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { label: '기관 공폐', internal: 0.2, external: 0.4 },
     ],
     externalComparison: [
-      { source: 'Omdia', waferBitOut: '-', bitGrowth: '-', gap: '-' },
+      { source: 'UBS', waferBitOut: '-', bitGrowth: '-', gap: '-' },
       { source: 'TrendForce', waferBitOut: '-', bitGrowth: '-', gap: '-' },
     ],
     news: [
@@ -639,7 +640,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
       { label: '기관 공폐', internal: 0.5, external: 0.8 },
     ],
     externalComparison: [
-      { source: 'Omdia', waferBitOut: '-', bitGrowth: '-', gap: '-' },
+      { source: 'UBS', waferBitOut: '-', bitGrowth: '-', gap: '-' },
       { source: 'TrendForce', waferBitOut: '-', bitGrowth: '-', gap: '-' },
     ],
     news: [
@@ -656,4 +657,90 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     foundryData: 'Intel 18A: 2025H2 목표, Intel 20A 양산 중',
     mktInfo: 'IFS 파운드리 시장 진입 중',
   },
+  Total_Foundry: {
+    customerId: 'Total_Foundry',
+    label: 'Total Foundry',
+    type: 'foundry',
+    productMix: [
+      { category: 'Advanced (<7nm)', percentage: 35, color: '#3B82F6' },
+      { category: 'Mature (>=28nm)', percentage: 45, color: '#10B981' },
+      { category: 'Specialty', percentage: 20, color: '#F59E0B' },
+    ],
+    kpiMetrics: [
+      { label: '총 투입량', value: '520', unit: 'Km²' },
+      { label: '평균 가동률', value: '82', unit: '%' },
+      { label: '평균 공폐율', value: '1.8', unit: '%' },
+    ],
+    configurableKpis: genConfigurableKpis('48', '95', '82', '9.2', '80'),
+    productMixTrend: [
+      { quarter: 'Q1 25', values: { 'Advanced': 33, 'Mature': 47, 'Specialty': 20 } },
+      { quarter: 'Q2 25', values: { 'Advanced': 34, 'Mature': 46, 'Specialty': 20 } },
+      { quarter: 'Q3 25', values: { 'Advanced': 34, 'Mature': 46, 'Specialty': 20 } },
+      { quarter: 'Q4 25', values: { 'Advanced': 35, 'Mature': 45, 'Specialty': 20 } },
+    ],
+    waferInput: genWaferInput(520),
+    monthlyMetrics: genMonthlyMetrics(520, 480, 1.5, 82, 95),
+    waferInOutQuarterly: genWaferInOutQuarterly(520, 500),
+    bitGrowthQuarterly: genBitGrowthQuarterly(5.0),
+    scrapRate: [
+      { label: '내부 공폐', internal: 1.6, external: 1.4 },
+      { label: '기관 공폐', internal: 0.2, external: 0.4 },
+    ],
+    externalComparison: [
+      { source: 'UBS', waferBitOut: '520K wsm', bitGrowth: '+5.0%', gap: '2.8%' },
+      { source: 'TrendForce', waferBitOut: '510K wsm', bitGrowth: '+4.5%', gap: '4.1%' },
+    ],
+    news: [
+      { source: 'TrendForce', date: '1/20', title: '2025 글로벌 파운드리 시장 +8% 성장 전망' },
+      { source: 'Omdia', date: '1/18', title: '파운드리 가동률 회복세, AI칩 수요 견인' },
+      { source: 'Gartner', date: '1/10', title: '2025 파운드리 시장 $150B 전망' },
+      { source: 'Bloomberg', date: '1/15', title: '글로벌 파운드리 CapEx 확대 사이클 진입' },
+      { source: 'Reuters', date: '1/22', title: '첨단공정 경쟁 심화, 3nm 이하 수주 확대' },
+    ],
+    weeklySummary: {
+      weekLabel: 'Week 1, Mar 2026',
+      comment: '전체 파운드리 시장 AI칩 수요 중심 성장. 첨단공정 경쟁 심화. 성숙공정 가동률 회복.',
+    },
+  },
 };
+
+// --- Post-processing: add DRAM ratio and version comparison data ---
+
+function addDramRatio(data: MonthlyMetricData[], baseRatio: number): MonthlyMetricData[] {
+  return data.map((d, i) => ({
+    ...d,
+    dramRatio: +(baseRatio + (seededValue(i * 29 + baseRatio * 100) - 0.5) * 0.04).toFixed(3),
+  }));
+}
+
+function genPrevVersionMetrics(current: MonthlyMetricData[]): MonthlyMetricData[] {
+  return current.map((d, i) => ({
+    ...d,
+    waferInput: +(d.waferInput * (0.97 + seededValue(i * 31 + 777) * 0.04)).toFixed(1),
+    purchaseVolume: +(d.purchaseVolume * (0.97 + seededValue(i * 37 + 888) * 0.04)).toFixed(1),
+    inventoryMonths: +(d.inventoryMonths * (0.98 + seededValue(i * 41 + 999) * 0.03)).toFixed(1),
+    utilization: +(d.utilization * (0.99 + seededValue(i * 43 + 111) * 0.02)).toFixed(1),
+    inventoryLevel: +(d.inventoryLevel * (0.98 + seededValue(i * 47 + 222) * 0.03)).toFixed(1),
+    capa: +(d.capa * (0.99 + seededValue(i * 53 + 333) * 0.02)).toFixed(1),
+  }));
+}
+
+const DRAM_RATIOS: Partial<Record<CustomerDetailId, number>> = {
+  SEC: 0.65,
+  SKHynix: 0.70,
+  Micron: 0.60,
+  Koxia: 0.20,
+  Total_DRAM_NAND: 0.55,
+};
+
+// Enrich all customers with version data and DRAM ratios
+for (const id of Object.keys(CUSTOMER_EXECUTIVES) as CustomerDetailId[]) {
+  const exec = CUSTOMER_EXECUTIVES[id];
+  const ratio = DRAM_RATIOS[id];
+  if (ratio !== undefined) {
+    exec.monthlyMetrics = addDramRatio(exec.monthlyMetrics, ratio);
+  }
+  exec.monthlyMetricsPrev = genPrevVersionMetrics(exec.monthlyMetrics);
+  exec.versionLabel = '26년 2월 집계';
+  exec.prevVersionLabel = '26년 1월 집계';
+}

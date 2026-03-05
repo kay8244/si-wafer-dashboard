@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { parseAiBullets, renderWithRefs } from '@/lib/news-utils';
+import { parseAiBullets, renderWithRefs, CollapsibleBullet, SourceBadge } from '@/lib/news-utils';
 import type { AppCategoryItem, AppCategoryType, ApplicationType, DeviceFilterItem, DeviceStackedEntry, TotalWaferQuarterlyEntry } from '@/types/v3';
 import { VCM_DATA, NEWS_QUERIES_BY_CATEGORY } from '@/data/v3/vcm-mock';
 import { useV2News, type NewsArticle } from '@/hooks/useV2News';
@@ -59,9 +59,19 @@ function InlineNews({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2.5 dark:bg-gray-800/50">
-        <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
-        <p className="text-xs text-gray-400">뉴스 분석 중...</p>
+      <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border-l-4 bg-gradient-to-r from-gray-50 to-white p-3 dark:from-gray-700/50 dark:to-gray-800" style={{ borderLeftColor: accentColor }}>
+          <div className="mb-2 flex items-center gap-1.5">
+            <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300" style={{ borderTopColor: accentColor }} />
+            <span className="text-xs font-bold" style={{ color: accentColor }}>AI 기사 요약 ({label})</span>
+          </div>
+          <div className="animate-pulse space-y-2">
+            <div className="h-3 w-5/6 rounded bg-gray-200 dark:bg-gray-600" />
+            <div className="h-3 w-3/4 rounded bg-gray-200 dark:bg-gray-600" />
+            <div className="h-3 w-4/6 rounded bg-gray-200 dark:bg-gray-600" />
+          </div>
+          <p className="mt-2 text-[11px] text-gray-400">기사를 수집하고 AI 요약을 생성하고 있습니다...</p>
+        </div>
       </div>
     );
   }
@@ -85,10 +95,7 @@ function InlineNews({
           </div>
           <ul className="space-y-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
             {bullets.map((bullet, idx) => (
-              <li key={idx} className="flex gap-1.5">
-                <span className="mt-0.5 shrink-0 text-gray-400">•</span>
-                <span>{renderWithRefs(bullet, list, accentColor)}</span>
-              </li>
+              <CollapsibleBullet key={idx} text={bullet} articles={list} accentColor={accentColor} />
             ))}
           </ul>
         </div>
@@ -99,7 +106,7 @@ function InlineNews({
         <div className={bullets.length > 0 ? 'mt-2' : ''}>
           <button
             onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-semibold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+            className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[12px] font-semibold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
           >
             <svg
               className={`h-3 w-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
@@ -121,17 +128,17 @@ function InlineNews({
                   className="group flex items-start gap-2 rounded-lg border border-gray-100 bg-white p-2.5 transition-all hover:border-gray-200 hover:shadow-sm dark:border-gray-600 dark:bg-gray-700/50 dark:hover:border-gray-500"
                 >
                   <span
-                    className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
+                    className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
                     style={{ backgroundColor: accentColor }}
                   >
                     {i + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-xs font-semibold leading-snug text-gray-800 group-hover:text-blue-600 dark:text-gray-100 dark:group-hover:text-blue-400">
+                    <h4 className="text-[13px] font-semibold leading-snug text-gray-800 group-hover:text-blue-600 dark:text-gray-100 dark:group-hover:text-blue-400">
                       {article.title}
                     </h4>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-gray-400 dark:text-gray-500">
-                      <span className="font-medium text-gray-500 dark:text-gray-400">{article.source}</span>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+                      <SourceBadge source={article.source} size="xs" />
                       {article.publishedDate && (
                         <>
                           <span className="text-gray-300 dark:text-gray-600">|</span>
@@ -217,10 +224,10 @@ function WaferDemandAnalysis({
         <svg className="h-4 w-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
         </svg>
-        <span className="text-xs font-bold text-purple-600 dark:text-purple-400">AI Wafer 수요 분석</span>
+        <span className="text-[13px] font-bold text-purple-600 dark:text-purple-400">AI Wafer 수요 분석</span>
         {loading && <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-purple-500" />}
       </div>
-      <ul className="space-y-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+      <ul className="space-y-2 text-[13px] leading-relaxed text-gray-600 dark:text-gray-400">
         <li className="flex gap-1.5">
           <span className="shrink-0 text-gray-400">•</span>
           <span>
@@ -247,18 +254,31 @@ function WaferDemandAnalysis({
             <svg className="h-3.5 w-3.5 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
               <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11H9v-2h2v2zm0-4H9V5h2v4z" />
             </svg>
-            <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400">Wafer 수요 관련 기사 요약</span>
+            <span className="text-[12px] font-bold text-purple-600 dark:text-purple-400">Wafer 수요 관련 기사 요약</span>
           </span>
         </li>
         {/* AI-sourced analysis for 주요 변동 요인 / 향후 전망 */}
+        {loading && aiBullets.length === 0 && (
+          <li className="mt-1">
+            <div className="rounded-lg border-l-4 border-purple-400 bg-gradient-to-r from-purple-50 to-white p-3 dark:from-purple-900/20 dark:to-gray-800">
+              <div className="mb-2 flex items-center gap-1.5">
+                <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-purple-500" />
+                <span className="text-xs font-bold text-purple-600 dark:text-purple-400">Wafer 수요 관련 기사 요약</span>
+              </div>
+              <div className="animate-pulse space-y-2">
+                <div className="h-3.5 w-5/6 rounded bg-purple-100 dark:bg-purple-800/30" />
+                <div className="h-3.5 w-3/4 rounded bg-purple-100 dark:bg-purple-800/30" />
+                <div className="h-3.5 w-4/6 rounded bg-purple-100 dark:bg-purple-800/30" />
+              </div>
+              <p className="mt-2 text-[12px] text-gray-400">기사를 수집하고 AI 요약을 생성하고 있습니다...</p>
+            </div>
+          </li>
+        )}
         {aiBullets.length > 0 ? (
           aiBullets.map((bullet, idx) => (
-            <li key={idx} className="flex gap-1.5">
-              <span className="shrink-0 text-gray-400">•</span>
-              <span>{renderWithRefs(bullet, list, '#8b5cf6')}</span>
-            </li>
+            <CollapsibleBullet key={idx} text={bullet} articles={list} accentColor="#8b5cf6" />
           ))
-        ) : (
+        ) : !loading && (
           <>
             <li className="flex gap-1.5">
               <span className="shrink-0 text-gray-400">•</span>
@@ -291,7 +311,7 @@ function WaferDemandAnalysis({
         <div className="mt-2 border-t border-gray-100 pt-2 dark:border-gray-700">
           <button
             onClick={() => setShowSources(!showSources)}
-            className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-semibold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+            className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[12px] font-semibold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
           >
             <svg
               className={`h-3 w-3 transition-transform ${showSources ? 'rotate-90' : ''}`}
@@ -312,17 +332,22 @@ function WaferDemandAnalysis({
                   rel="noopener noreferrer"
                   className="group flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
                 >
-                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-purple-500 text-[9px] font-bold text-white">
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-purple-500 text-[10px] font-bold text-white">
                     {i + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-medium leading-snug text-gray-700 group-hover:text-purple-600 dark:text-gray-300 dark:group-hover:text-purple-400 line-clamp-1">
+                    <p className="text-[12px] font-medium leading-snug text-gray-700 group-hover:text-purple-600 dark:text-gray-300 dark:group-hover:text-purple-400 line-clamp-1">
                       {article.title}
                     </p>
-                    <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                      {article.source}
-                      {article.publishedDate && ` | ${new Date(article.publishedDate).toLocaleDateString('ko-KR')}`}
-                    </p>
+                    <div className="flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+                      <SourceBadge source={article.source} size="xs" />
+                      {article.publishedDate && (
+                        <>
+                          <span className="text-gray-300 dark:text-gray-600">|</span>
+                          <span>{new Date(article.publishedDate).toLocaleDateString('ko-KR')}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </a>
               ))}
@@ -358,12 +383,15 @@ export default function VcmPage() {
     return NEWS_QUERIES_BY_CATEGORY[categoryKey];
   }, [categoryKey]);
 
-  const { articles, answer, loading: newsLoading } = useV2News(newsQuery.queryKo, newsQuery.queryEn);
+  const appContext = `${selectedCategory.label} 반도체 수요 및 실리콘 웨이퍼 영향`;
+  const { articles, answer, loading: newsLoading } = useV2News(newsQuery.queryKo, newsQuery.queryEn, undefined, appContext);
 
   // Wafer demand analysis news
   const { articles: waferArticles, answer: waferAnswer, loading: waferNewsLoading } = useV2News(
     '반도체 웨이퍼 수요 전망 HBM AI서버 EPI 실리콘',
     'semiconductor wafer demand outlook HBM AI server silicon',
+    undefined,
+    '실리콘 웨이퍼 수요 전망 - 반도체 업황이 EPI/SOI 등 실리콘 웨이퍼 수급에 미치는 영향',
   );
 
   // Primary app chart data
