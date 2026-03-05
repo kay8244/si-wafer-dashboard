@@ -1,6 +1,6 @@
 'use client';
 
-import V3Container from '@/components/v3/V3Container';
+import V3Container from '@/components/V3Container';
 
 export default function V3Page() {
   return (

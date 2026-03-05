@@ -13,7 +13,7 @@ export default function Home() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Top bar: V2 link + Dark mode toggle */}
+      {/* Top bar: Dark mode toggle */}
       <div className="mb-4 flex items-center justify-end gap-3">
         <button
           onClick={toggle}
@@ -30,12 +30,6 @@ export default function Home() {
             </svg>
           )}
         </button>
-        <a
-          href="/v2"
-          className="rounded-lg bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
-        >
-          V2 현황판 →
-        </a>
       </div>
 
       {/* Top-level Tab Navigation */}
