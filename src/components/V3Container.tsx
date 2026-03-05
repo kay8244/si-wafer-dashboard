@@ -53,6 +53,12 @@ export default function V3Container() {
               </svg>
             )}
           </button>
+          <a
+            href="/analysis"
+            className="rounded-md bg-gray-100 px-2.5 py-1.5 text-center text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+          >
+            경쟁사/고객실적
+          </a>
         </div>
       </div>
 
