@@ -78,7 +78,7 @@ function getQuarterLabel(quarter: string): string {
 
 export default function DeviceStackedChart({ title, data, deviceFilters, timeRange, onTimeRangeChange }: DeviceStackedChartProps) {
   const { isDark } = useDarkMode();
-  const [showQoQ, setShowQoQ] = useState(false);
+  const [showQoQ, setShowQoQ] = useState(true);
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
   const labelFill = isDark ? '#cbd5e1' : '#374151';
   const tooltipStyle = isDark

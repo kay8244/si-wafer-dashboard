@@ -48,7 +48,7 @@ function getQuarterLabel(quarter: string): string {
 export default function TotalWaferLineChart({ data, timeRange: controlledRange, onTimeRangeChange }: Props) {
   const { isDark } = useDarkMode();
   const [internalRange, setInternalRange] = useState<TimeRange>(8);
-  const [showQoQ, setShowQoQ] = useState(false);
+  const [showQoQ, setShowQoQ] = useState(true);
   const timeRange = controlledRange ?? internalRange;
   const setTimeRange = onTimeRangeChange ?? setInternalRange;
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
@@ -109,7 +109,7 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
   }, [filteredData]);
 
   return (
-    <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800" style={{ minHeight: 530 }}>
+    <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800" style={{ minHeight: 540 }}>
       {/* Header row: title + time range buttons + legend */}
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="shrink-0 text-base font-bold text-gray-800 dark:text-gray-100">

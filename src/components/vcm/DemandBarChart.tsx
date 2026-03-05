@@ -89,7 +89,7 @@ export default function DemandBarChart({
   mountData,
 }: DemandBarChartProps) {
   const { isDark } = useDarkMode();
-  const [showQoQ, setShowQoQ] = useState(false);
+  const [showQoQ, setShowQoQ] = useState(true);
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
   const labelFill = isDark ? '#cbd5e1' : '#374151';
   const tooltipStyle = isDark
@@ -188,7 +188,7 @@ export default function DemandBarChart({
   }, [filteredData]);
 
   return (
-    <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800" style={{ minHeight: 530 }}>
+    <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800" style={{ minHeight: 540 }}>
       {/* Header: title + time range selector */}
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">{title}</h3>

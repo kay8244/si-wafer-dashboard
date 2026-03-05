@@ -19,6 +19,7 @@ const foundryAll = CUSTOMER_LIST.find((c) => c.id === 'Total_Foundry');
 export default function CustomerDetailPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDetailId>('SEC');
   const [quarterRange, setQuarterRange] = useState<4 | 8 | 12>(8);
+  const [showNews, setShowNews] = useState(false);
 
   const data = CUSTOMER_EXECUTIVES[selectedCustomer];
 
@@ -64,6 +65,20 @@ export default function CustomerDetailPage() {
     <div className="flex h-full flex-col" style={{ height: 'calc(100vh - 80px)' }}>
       {/* Customer tabs */}
       <div className="flex items-center gap-4 border-b border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900">
+        <button
+          onClick={() => setShowNews(!showNews)}
+          className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+            showNews
+              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+              : 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
+          }`}
+        >
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+          </svg>
+          뉴스
+        </button>
+        <div className="h-4 w-px bg-gray-200 dark:bg-gray-600" />
         {/* Memory */}
         <div className="flex items-center gap-1">
           <span className="mr-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500">메모리</span>
@@ -160,13 +175,15 @@ export default function CustomerDetailPage() {
           {data.estimateTrend && (
             <EstimateTrendChart data={data.estimateTrend} />
           )}
-          <CustomerNewsPanel
-            articles={newsArticles}
-            answer={answer}
-            loading={loading}
-            error={error}
-            customerLabel={newsLabel}
-          />
+          {showNews && (
+            <CustomerNewsPanel
+              articles={newsArticles}
+              answer={answer}
+              loading={loading}
+              error={error}
+              customerLabel={newsLabel}
+            />
+          )}
         </div>
       </div>
     </div>
