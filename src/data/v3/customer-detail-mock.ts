@@ -1,4 +1,4 @@
-import type { CustomerExecutive, CustomerDetailId, MonthlyMetricData, ConfigurableKpi, NewsCategory, AggregateCustomerId, WaferInOutQuarterlyEntry, BitGrowthQuarterlyEntry } from '@/types/v3';
+import type { CustomerExecutive, CustomerDetailId, MonthlyMetricData, ConfigurableKpi, NewsCategory, AggregateCustomerId, WaferInOutQuarterlyEntry, BitGrowthQuarterlyEntry, EstimateTrendData } from '@/types/v3';
 
 export const CUSTOMER_LIST: { id: CustomerDetailId; label: string; type: 'memory' | 'foundry' | 'aggregate'; subLabel?: string }[] = [
   { id: 'Total_DRAM_NAND', label: 'Total DRAM/NAND', type: 'aggregate' },
@@ -78,7 +78,7 @@ function genConfigurableKpis(
   ];
 }
 
-function genWaferInOutQuarterly(baseIn: number, baseOut: number): WaferInOutQuarterlyEntry[] {
+function genWaferInOutQuarterly(baseIn: number, baseOut: number, dramRatio?: number): WaferInOutQuarterlyEntry[] {
   const qs = ["Q1'23","Q2'23","Q3'23","Q4'23","Q1'24","Q2'24","Q3'24","Q4'24","Q1'25","Q2'25","Q3'25","Q4'25","Q1'26(E)","Q2'26(E)","Q3'26(E)","Q4'26(E)","Q1'27(E)","Q2'27(E)"];
   return qs.map((q, i) => {
     const growth = 1 + i * 0.018;
@@ -88,6 +88,7 @@ function genWaferInOutQuarterly(baseIn: number, baseOut: number): WaferInOutQuar
       waferIn: +(baseIn * growth * seasonal + (seededValue(i * 7 + baseIn) - 0.5) * baseIn * 0.12).toFixed(0),
       waferOut: +(baseOut * growth * seasonal + (seededValue(i * 11 + baseOut) - 0.5) * baseOut * 0.1).toFixed(0),
       isEstimate: q.includes('(E)'),
+      ...(dramRatio !== undefined ? { dramRatio: +(dramRatio + (seededValue(i * 31 + dramRatio * 100) - 0.5) * 0.04).toFixed(3) } : {}),
     };
   });
 }
@@ -97,8 +98,29 @@ function genBitGrowthQuarterly(baseGrowth: number): BitGrowthQuarterlyEntry[] {
   return qs.map((q, i) => ({
     quarter: q,
     growth: +(baseGrowth + (seededValue(i * 13 + baseGrowth * 10) - 0.5) * 8 + i * 0.5).toFixed(1),
+    growthTF: +(baseGrowth * 0.95 + (seededValue(i * 17 + baseGrowth * 7) - 0.5) * 7 + i * 0.45).toFixed(1),
     isEstimate: q.includes('(E)'),
   }));
+}
+
+/** Generate estimate trend: how UBS/TrendForce revised their 2026 estimates over H2 2025 reports */
+function genEstimateTrend(baseIn: number, baseOut: number, baseGrowth: number): EstimateTrendData {
+  const months = ['25.06', '25.07', '25.08', '25.09', '25.10', '25.11', '25.12'];
+  return {
+    targetYear: 2026,
+    ubs: months.map((m, i) => ({
+      reportDate: m,
+      waferIn: +(baseIn + (seededValue(i * 7 + baseIn) - 0.4) * baseIn * 0.06 + i * baseIn * 0.008).toFixed(1),
+      waferOut: +(baseOut + (seededValue(i * 11 + baseOut) - 0.4) * baseOut * 0.05 + i * baseOut * 0.007).toFixed(1),
+      bitGrowth: +(baseGrowth + (seededValue(i * 3 + baseGrowth * 5) - 0.5) * 3 + i * 0.3).toFixed(1),
+    })),
+    trendforce: months.map((m, i) => ({
+      reportDate: m,
+      waferIn: +(baseIn * 0.98 + (seededValue(i * 9 + baseIn * 2) - 0.4) * baseIn * 0.05 + i * baseIn * 0.009).toFixed(1),
+      waferOut: +(baseOut * 0.97 + (seededValue(i * 13 + baseOut * 2) - 0.4) * baseOut * 0.06 + i * baseOut * 0.008).toFixed(1),
+      bitGrowth: +(baseGrowth * 0.95 + (seededValue(i * 5 + baseGrowth * 3) - 0.5) * 2.5 + i * 0.25).toFixed(1),
+    })),
+  };
 }
 
 const NEWS_CATEGORIES: Record<string, NewsCategory[]> = {
@@ -148,8 +170,9 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     ],
     waferInput: genWaferInput(45),
     monthlyMetrics: genMonthlyMetrics(45, 38, 2.1, 91, 78),
-    waferInOutQuarterly: genWaferInOutQuarterly(45, 43),
+    waferInOutQuarterly: genWaferInOutQuarterly(45, 43, 0.62),
     bitGrowthQuarterly: genBitGrowthQuarterly(8.2),
+    estimateTrend: genEstimateTrend(47, 45, 9.0),
     scrapRate: [
       { label: '내부 공폐', internal: 2.1, external: 1.8 },
       { label: '기관 공폐', internal: 0.3, external: 0.5 },
@@ -197,8 +220,9 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     ],
     waferInput: genWaferInput(52),
     monthlyMetrics: genMonthlyMetrics(52, 44, 1.8, 94, 72),
-    waferInOutQuarterly: genWaferInOutQuarterly(52, 50),
+    waferInOutQuarterly: genWaferInOutQuarterly(52, 50, 0.58),
     bitGrowthQuarterly: genBitGrowthQuarterly(12.5),
+    estimateTrend: genEstimateTrend(54, 52, 13.0),
     scrapRate: [
       { label: '내부 공폐', internal: 1.5, external: 1.4 },
       { label: '기관 공폐', internal: 0.2, external: 0.4 },
@@ -246,8 +270,9 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     ],
     waferInput: genWaferInput(38),
     monthlyMetrics: genMonthlyMetrics(38, 32, 2.5, 88, 82),
-    waferInOutQuarterly: genWaferInOutQuarterly(38, 36),
+    waferInOutQuarterly: genWaferInOutQuarterly(38, 36, 0.65),
     bitGrowthQuarterly: genBitGrowthQuarterly(6.5),
+    estimateTrend: genEstimateTrend(40, 38, 7.0),
     scrapRate: [
       { label: '내부 공폐', internal: 2.5, external: 2.0 },
       { label: '기관 공폐', internal: 0.4, external: 0.6 },
@@ -295,6 +320,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     monthlyMetrics: genMonthlyMetrics(28, 24, 1.5, 72, 65),
     waferInOutQuarterly: genWaferInOutQuarterly(28, 26),
     bitGrowthQuarterly: genBitGrowthQuarterly(3.5),
+    estimateTrend: genEstimateTrend(30, 28, 4.0),
     scrapRate: [
       { label: '내부 공폐', internal: 2.8, external: 2.2 },
       { label: '기관 공폐', internal: 0.5, external: 0.7 },
@@ -490,8 +516,9 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     ],
     waferInput: genWaferInput(135),
     monthlyMetrics: genMonthlyMetrics(135, 114, 2.0, 89, 76),
-    waferInOutQuarterly: genWaferInOutQuarterly(135, 130),
+    waferInOutQuarterly: genWaferInOutQuarterly(135, 130, 0.60),
     bitGrowthQuarterly: genBitGrowthQuarterly(9.1),
+    estimateTrend: genEstimateTrend(140, 135, 9.5),
     scrapRate: [
       { label: '내부 공폐', internal: 2.0, external: 1.7 },
       { label: '기관 공폐', internal: 0.3, external: 0.5 },
@@ -537,7 +564,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     ],
     waferInput: genWaferInput(32),
     monthlyMetrics: genMonthlyMetrics(32, 27, 2.2, 85, 80),
-    waferInOutQuarterly: genWaferInOutQuarterly(32, 30),
+    waferInOutQuarterly: genWaferInOutQuarterly(32, 30, 0.45),
     bitGrowthQuarterly: genBitGrowthQuarterly(5.8),
     scrapRate: [
       { label: '내부 공폐', internal: 2.2, external: 1.8 },

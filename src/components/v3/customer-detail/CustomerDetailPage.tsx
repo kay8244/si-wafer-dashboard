@@ -6,6 +6,7 @@ import { CUSTOMER_LIST, CUSTOMER_EXECUTIVES } from '@/data/v3/customer-detail-mo
 import { useV2News } from '@/hooks/useV2News';
 import ExecutivePanel from './ExecutivePanel';
 import ExternalComparison from './ExternalComparison';
+import EstimateTrendChart from './EstimateTrendChart';
 import CustomerNewsPanel from './CustomerNewsPanel';
 import WeeklySummary from './WeeklySummary';
 import MonthlyMetricsChart from './MonthlyMetricsChart';
@@ -156,6 +157,9 @@ export default function CustomerDetailPage() {
             onQuarterRangeChange={setQuarterRange}
             customerType={data.type}
           />
+          {data.estimateTrend && (
+            <EstimateTrendChart data={data.estimateTrend} />
+          )}
           <CustomerNewsPanel
             articles={newsArticles}
             answer={answer}

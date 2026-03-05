@@ -240,11 +240,13 @@ export interface WaferInOutQuarterlyEntry {
   waferIn: number;
   waferOut: number;
   isEstimate: boolean;
+  dramRatio?: number;
 }
 
 export interface BitGrowthQuarterlyEntry {
   quarter: string;
   growth: number;
+  growthTF?: number;
   isEstimate: boolean;
 }
 
@@ -267,10 +269,24 @@ export interface CustomerExecutive {
   weeklySummary: WeeklySummary;
   waferInOutQuarterly: WaferInOutQuarterlyEntry[];
   bitGrowthQuarterly: BitGrowthQuarterlyEntry[];
+  estimateTrend?: EstimateTrendData;
   foundryData?: string;
   mktInfo?: string;
   newsQueryKo?: string;
   newsQueryEn?: string;
+}
+
+export interface EstimateTrendPoint {
+  reportDate: string; // e.g. "Jun'25", "Jul'25"
+  waferIn: number;
+  waferOut: number;
+  bitGrowth: number;
+}
+
+export interface EstimateTrendData {
+  targetYear: number; // e.g. 2026
+  ubs: EstimateTrendPoint[];
+  trendforce: EstimateTrendPoint[];
 }
 
 // Quarterly data for bar charts

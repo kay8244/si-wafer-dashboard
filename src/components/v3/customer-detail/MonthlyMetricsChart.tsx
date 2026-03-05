@@ -160,6 +160,7 @@ export default function MonthlyMetricsChart({
   ]);
   const [granularity, setGranularity] = useState<TimeGranularity>('quarterly');
   const [showVersionCompare, setShowVersionCompare] = useState(false);
+  const [waferFilter, setWaferFilter] = useState<'all' | 'dram' | 'nand'>('all');
 
   function toggleMetric(key: MetricKey) {
     setSelectedMetrics((prev) =>
@@ -214,12 +215,28 @@ export default function MonthlyMetricsChart({
 
   const isMemory = customerType === 'memory';
   const hasDramRatio = enrichedData.some(d => d.dramRatio !== undefined);
-  const canSplit = isMemory && hasDramRatio;
+  const canSplit = isMemory && hasDramRatio && waferFilter === 'all';
+  const canFilter = isMemory && hasDramRatio;
   const hasVersionData = !!prevVersionData && prevVersionData.length > 0;
+
+  // Apply DRAM/NAND filter to data (for 'dram' or 'nand' selections)
+  const filteredEnrichedData = useMemo(() => {
+    if (!canFilter || waferFilter === 'all') return enrichedData;
+    return enrichedData.map((d) => {
+      if (d.dramRatio === undefined) return d;
+      const r = waferFilter === 'dram' ? d.dramRatio : (1 - d.dramRatio);
+      const filtered = { ...d };
+      for (const key of SPLITTABLE_KEYS) {
+        (filtered as Record<string, unknown>)[key] = +((d[key] as number) * r).toFixed(1);
+      }
+      return filtered;
+    });
+  }, [enrichedData, canFilter, waferFilter]);
 
   // Chart data with split and version fields
   const chartData = useMemo(() => {
-    return enrichedData.map((d, i) => {
+    const sourceData = waferFilter === 'all' ? enrichedData : filteredEnrichedData;
+    return sourceData.map((d, i) => {
       const entry: Record<string, unknown> = { ...d };
 
       // DRAM/NAND split fields (only splittable bar metrics)
@@ -243,7 +260,7 @@ export default function MonthlyMetricsChart({
 
       return entry;
     });
-  }, [enrichedData, prevEnrichedData, canSplit, showVersionCompare]);
+  }, [enrichedData, filteredEnrichedData, prevEnrichedData, canSplit, showVersionCompare, waferFilter]);
 
   // Dynamic "현재" marker based on actual current date
   const currentMarkerMonth = useMemo(() => {
@@ -272,6 +289,9 @@ export default function MonthlyMetricsChart({
   const activeBarMetrics = BAR_METRICS.filter((m) => selectedMetrics.includes(m.key));
   const activeLineMetrics = LINE_METRICS.filter((m) => selectedMetrics.includes(m.key));
   const activeMetrics = ALL_METRICS.filter((m) => selectedMetrics.includes(m.key));
+
+  // Display data for table — uses filtered data when DRAM/NAND filter active
+  const displayData = waferFilter === 'all' ? enrichedData : filteredEnrichedData;
 
   // Year groups for table header merging
   const yearGroups = useMemo(() => {
@@ -377,6 +397,25 @@ export default function MonthlyMetricsChart({
               </button>
             ))}
           </div>
+
+          {/* DRAM/NAND filter */}
+          {canFilter && (
+            <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-600">
+              {(['all', 'dram', 'nand'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setWaferFilter(f)}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                    waferFilter === f
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
+                  }`}
+                >
+                  {f === 'all' ? 'ALL' : f.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -547,7 +586,7 @@ export default function MonthlyMetricsChart({
       )}
 
       {/* Data table with MoM/QoQ/YoY sub-rows */}
-      {enrichedData.length > 0 && activeMetrics.length > 0 && (
+      {displayData.length > 0 && activeMetrics.length > 0 && (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
@@ -571,7 +610,7 @@ export default function MonthlyMetricsChart({
               </tr>
               {/* Month/Quarter row */}
               <tr className="bg-gray-50 dark:bg-gray-600">
-                {enrichedData.map((d) => (
+                {displayData.map((d) => (
                   <th
                     key={d.month}
                     className="text-center px-1.5 py-1 border border-gray-200 font-semibold text-gray-600 whitespace-nowrap dark:border-gray-600 dark:text-gray-300"
@@ -593,7 +632,7 @@ export default function MonthlyMetricsChart({
                       >
                         {metric.label}
                       </td>
-                      {enrichedData.map((d) => (
+                      {displayData.map((d) => (
                         <td
                           key={d.month}
                           className="px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap text-gray-700 dark:border-gray-600 dark:text-gray-300"
@@ -626,7 +665,7 @@ export default function MonthlyMetricsChart({
                         <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-medium whitespace-nowrap text-amber-600 dark:border-gray-600 dark:text-amber-400">
                           차이
                         </td>
-                        {enrichedData.map((d, i) => {
+                        {displayData.map((d, i) => {
                           const curr = d[metric.key] as number;
                           const prev = prevEnrichedData[i]?.[metric.key] as number | undefined;
                           if (prev === undefined) return <td key={d.month} className="px-1.5 py-0.5 border border-gray-200 text-right text-[10px] text-gray-300 dark:border-gray-600">-</td>;
@@ -652,7 +691,7 @@ export default function MonthlyMetricsChart({
                           >
                             DRAM
                           </td>
-                          {enrichedData.map((d) => {
+                          {displayData.map((d) => {
                             const ratio = d.dramRatio ?? 0.5;
                             const val = (d[metric.key] as number) * ratio;
                             return (
@@ -669,7 +708,7 @@ export default function MonthlyMetricsChart({
                           >
                             NAND
                           </td>
-                          {enrichedData.map((d) => {
+                          {displayData.map((d) => {
                             const ratio = d.dramRatio ?? 0.5;
                             const val = (d[metric.key] as number) * (1 - ratio);
                             return (
@@ -688,8 +727,8 @@ export default function MonthlyMetricsChart({
                         <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">
                           MoM
                         </td>
-                        {enrichedData.map((d, i) => {
-                          const g = computeGrowth(enrichedData, metric.key, i, growthOffsets.mom);
+                        {displayData.map((d, i) => {
+                          const g = computeGrowth(displayData, metric.key, i, growthOffsets.mom);
                           const { text, color } = formatGrowth(g);
                           return (
                             <td key={d.month} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
@@ -706,8 +745,8 @@ export default function MonthlyMetricsChart({
                         <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">
                           QoQ
                         </td>
-                        {enrichedData.map((d, i) => {
-                          const g = computeGrowth(enrichedData, metric.key, i, growthOffsets.qoq);
+                        {displayData.map((d, i) => {
+                          const g = computeGrowth(displayData, metric.key, i, growthOffsets.qoq);
                           const { text, color } = formatGrowth(g);
                           return (
                             <td key={d.month} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
@@ -724,8 +763,8 @@ export default function MonthlyMetricsChart({
                         <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">
                           YoY
                         </td>
-                        {enrichedData.map((d, i) => {
-                          const g = computeGrowth(enrichedData, metric.key, i, growthOffsets.yoy);
+                        {displayData.map((d, i) => {
+                          const g = computeGrowth(displayData, metric.key, i, growthOffsets.yoy);
                           const { text, color } = formatGrowth(g);
                           return (
                             <td key={d.month} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>

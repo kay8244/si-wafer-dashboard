@@ -30,6 +30,7 @@ interface Props {
 }
 
 type QuarterRange = 4 | 8 | 12;
+type MetricKey = 'waferIn' | 'waferOut' | 'ubsGrowth' | 'tfGrowth';
 
 const TIME_PRESETS: { value: QuarterRange; label: string }[] = [
   { value: 4, label: '4Q' },
@@ -37,19 +38,25 @@ const TIME_PRESETS: { value: QuarterRange; label: string }[] = [
   { value: 12, label: '12Q' },
 ];
 
+const METRIC_OPTIONS: { key: MetricKey; label: string }[] = [
+  { key: 'waferIn', label: 'Wafer In' },
+  { key: 'waferOut', label: 'Wafer Out' },
+  { key: 'ubsGrowth', label: 'Bit Growth (UBS)' },
+  { key: 'tfGrowth', label: 'Bit Growth (TF)' },
+];
+
 interface CombinedEntry {
   quarter: string;
   waferIn: number;
   waferOut: number;
-  bitGrowth: number;
+  waferInDram: number;
+  waferInNand: number;
+  waferOutDram: number;
+  waferOutNand: number;
+  ubsGrowth: number;
+  tfGrowth: number;
   isEstimate: boolean;
 }
-
-/** Source-specific multiplier for chart data differentiation */
-const SOURCE_FACTOR: Record<string, number> = {
-  UBS: 1.0,
-  TrendForce: 0.97,
-};
 
 function getYear(quarter: string): string {
   const match = quarter.match(/'(\d{2})/);
@@ -83,9 +90,25 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
   const { isDark } = useDarkMode();
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
   const gridStroke = isDark ? '#334155' : '#e5e7eb';
-  const [selectedSource, setSelectedSource] = useState<string>(data[0]?.source ?? 'UBS');
+  const [waferFilter, setWaferFilter] = useState<'all' | 'dram' | 'nand'>('all');
+  const [visibleMetrics, setVisibleMetrics] = useState<Set<MetricKey>>(new Set(['waferIn']));
 
-  const factor = SOURCE_FACTOR[selectedSource] ?? 1.0;
+  const isMemory = customerType === 'memory';
+  const hasDramRatio = waferInOutData.some((d) => d.dramRatio !== undefined);
+  const canFilter = isMemory && hasDramRatio;
+  const canSplit = canFilter && waferFilter === 'all';
+
+  const toggleMetric = (key: MetricKey) => {
+    setVisibleMetrics((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        if (next.size > 1) next.delete(key); // keep at least one
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   // Find current boundary (first estimate = current quarter)
   const currentIdx = useMemo(() => {
@@ -106,15 +129,25 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
     return waferInOutData.slice(adjustedStart, end).map((w, i) => {
       const globalIdx = adjustedStart + i;
       const bg = globalIdx < bitGrowthData.length ? bitGrowthData[globalIdx] : null;
+      const dr = w.dramRatio ?? 0.6;
+      // Apply DRAM/NAND filter for single-mode
+      const ratio = canFilter && w.dramRatio !== undefined
+        ? (waferFilter === 'dram' ? dr : waferFilter === 'nand' ? (1 - dr) : 1)
+        : 1;
       return {
         quarter: w.quarter,
-        waferIn: +(w.waferIn * factor).toFixed(1),
-        waferOut: +(w.waferOut * factor).toFixed(1),
-        bitGrowth: bg ? +(bg.growth * factor).toFixed(1) : 0,
+        waferIn: +(w.waferIn * ratio).toFixed(1),
+        waferOut: +(w.waferOut * ratio).toFixed(1),
+        waferInDram: +(w.waferIn * dr).toFixed(1),
+        waferInNand: +(w.waferIn * (1 - dr)).toFixed(1),
+        waferOutDram: +(w.waferOut * dr).toFixed(1),
+        waferOutNand: +(w.waferOut * (1 - dr)).toFixed(1),
+        ubsGrowth: bg ? +bg.growth.toFixed(1) : 0,
+        tfGrowth: bg?.growthTF != null ? +bg.growthTF.toFixed(1) : (bg ? +(bg.growth * 0.95).toFixed(1) : 0),
         isEstimate: w.isEstimate,
       };
     });
-  }, [waferInOutData, bitGrowthData, quarterRange, currentIdx, factor]);
+  }, [waferInOutData, bitGrowthData, quarterRange, currentIdx, canFilter, waferFilter]);
 
   const boundaryQuarter = currentIdx >= 0 ? waferInOutData[currentIdx]?.quarter : undefined;
 
@@ -154,6 +187,12 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
     ? { fontSize: 11, borderRadius: 6, backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' }
     : { fontSize: 11, borderRadius: 6 };
 
+  const showIn = visibleMetrics.has('waferIn');
+  const showOut = visibleMetrics.has('waferOut');
+  const showUbsGrowth = visibleMetrics.has('ubsGrowth');
+  const showTfGrowth = visibleMetrics.has('tfGrowth');
+  const showAnyGrowth = showUbsGrowth || showTfGrowth;
+
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-md dark:border-gray-700 dark:bg-gray-800">
       {/* Header */}
@@ -176,21 +215,41 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
         </div>
       </div>
 
-      {/* Source toggle — no summary numbers */}
-      <div className="mb-2 flex items-center gap-1">
-        {data.map((src) => (
-          <button
-            key={src.source}
-            onClick={() => setSelectedSource(src.source)}
-            className={`rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-              selectedSource === src.source
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
-            }`}
-          >
-            {src.source}
-          </button>
-        ))}
+      {/* Filter row: DRAM/NAND/ALL + Metric toggles */}
+      <div className="mb-2 flex items-center gap-2">
+        {canFilter && (
+          <div className="flex items-center gap-1">
+            {(['all', 'dram', 'nand'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setWaferFilter(f)}
+                className={`rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                  waferFilter === f
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+                }`}
+              >
+                {f.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        )}
+        {canFilter && <div className="h-3 w-px bg-gray-200 dark:bg-gray-600" />}
+        <div className="flex items-center gap-1">
+          {METRIC_OPTIONS.map((m) => (
+            <button
+              key={m.key}
+              onClick={() => toggleMetric(m.key)}
+              className={`rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                visibleMetrics.has(m.key)
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Year labels above chart */}
@@ -212,7 +271,7 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
         </div>
       )}
 
-      {/* Combined Chart: Wafer In/Out bars + Bit Growth line */}
+      {/* Combined Chart */}
       <div style={{ height: 200 }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={filteredData} margin={{ top: 20, right: 4, left: 0, bottom: 4 }}>
@@ -232,22 +291,33 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
               width={32}
               label={{ value: 'Km\u00B2', position: 'insideTopLeft', offset: -5, fontSize: 8, fill: tickFill }}
             />
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              tick={{ fontSize: 9, fill: tickFill }}
-              axisLine={false}
-              tickLine={false}
-              width={28}
-              tickFormatter={(v) => `${v}%`}
-            />
+            {showAnyGrowth && (
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fontSize: 9, fill: tickFill }}
+                axisLine={false}
+                tickLine={false}
+                width={28}
+                tickFormatter={(v) => `${v}%`}
+              />
+            )}
             <Tooltip
               contentStyle={tooltipStyle}
               formatter={(value, name) => {
-                const label =
-                  name === 'waferIn' ? 'Wafer In' : name === 'waferOut' ? 'Wafer Out' : 'Bit Growth';
-                const unit = name === 'bitGrowth' ? '%' : ' Km\u00B2';
-                return [`${Number(value).toLocaleString()}${unit}`, label];
+                const labels: Record<string, string> = {
+                  waferIn: 'Wafer In (UBS)',
+                  waferInDram: 'In DRAM',
+                  waferInNand: 'In NAND',
+                  waferOut: 'Wafer Out (TF)',
+                  waferOutDram: 'Out DRAM',
+                  waferOutNand: 'Out NAND',
+                  ubsGrowth: 'Bit Growth (UBS)',
+                  tfGrowth: 'Bit Growth (TF)',
+                };
+                const n = String(name);
+                const unit = n.includes('Growth') ? '%' : ' Km\u00B2';
+                return [`${Number(value).toLocaleString()}${unit}`, labels[n] ?? n];
               }}
             />
             {boundaryQuarter && filteredData.some((d) => d.quarter === boundaryQuarter) && (
@@ -286,61 +356,168 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
                 }}
               />
             )}
-            <Bar yAxisId="left" dataKey="waferIn" fill="#3b82f6" radius={[2, 2, 0, 0]} barSize={8}>
-              {filteredData.map((entry, i) => (
-                <Cell key={`in-${i}`} opacity={entry.isEstimate ? 0.5 : 1} />
-              ))}
-            </Bar>
-            <Bar yAxisId="left" dataKey="waferOut" fill="#10b981" radius={[2, 2, 0, 0]} barSize={8}>
-              {filteredData.map((entry, i) => (
-                <Cell key={`out-${i}`} opacity={entry.isEstimate ? 0.5 : 1} />
-              ))}
-            </Bar>
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="bitGrowth"
-              stroke="#f59e0b"
-              strokeWidth={2}
-              dot={(props: Record<string, unknown>) => {
-                const { cx, cy, payload } = props as {
-                  cx: number;
-                  cy: number;
-                  payload: CombinedEntry;
-                };
-                if (!payload) return <circle key="empty" />;
-                return (
-                  <circle
-                    key={payload.quarter}
-                    cx={cx}
-                    cy={cy}
-                    r={3}
-                    fill={payload.isEstimate ? (isDark ? '#1e293b' : '#fff') : '#f59e0b'}
-                    stroke="#f59e0b"
-                    strokeWidth={1.5}
-                  />
-                );
-              }}
-              activeDot={{ r: 4, fill: '#f59e0b' }}
-            />
+
+            {/* Wafer In bars */}
+            {showIn && !canSplit && (
+              <Bar yAxisId="left" dataKey="waferIn" fill="#3b82f6" radius={[2, 2, 0, 0]} barSize={8} stackId={undefined}>
+                {filteredData.map((entry, i) => (
+                  <Cell key={`in-${i}`} opacity={entry.isEstimate ? 0.5 : 1} />
+                ))}
+              </Bar>
+            )}
+            {showIn && canSplit && (
+              <Bar yAxisId="left" dataKey="waferInNand" fill="#93c5fd" stackId="in" barSize={8}>
+                {filteredData.map((entry, i) => (
+                  <Cell key={`in-nand-${i}`} opacity={entry.isEstimate ? 0.5 : 1} />
+                ))}
+              </Bar>
+            )}
+            {showIn && canSplit && (
+              <Bar yAxisId="left" dataKey="waferInDram" fill="#3b82f6" stackId="in" radius={[2, 2, 0, 0]} barSize={8}>
+                {filteredData.map((entry, i) => (
+                  <Cell key={`in-dram-${i}`} opacity={entry.isEstimate ? 0.5 : 1} />
+                ))}
+              </Bar>
+            )}
+
+            {/* Wafer Out bars */}
+            {showOut && !canSplit && (
+              <Bar yAxisId="left" dataKey="waferOut" fill="#10b981" radius={[2, 2, 0, 0]} barSize={8}>
+                {filteredData.map((entry, i) => (
+                  <Cell key={`out-${i}`} opacity={entry.isEstimate ? 0.5 : 1} />
+                ))}
+              </Bar>
+            )}
+            {showOut && canSplit && (
+              <Bar yAxisId="left" dataKey="waferOutNand" fill="#6ee7b7" stackId="out" barSize={8}>
+                {filteredData.map((entry, i) => (
+                  <Cell key={`out-nand-${i}`} opacity={entry.isEstimate ? 0.5 : 1} />
+                ))}
+              </Bar>
+            )}
+            {showOut && canSplit && (
+              <Bar yAxisId="left" dataKey="waferOutDram" fill="#10b981" stackId="out" radius={[2, 2, 0, 0]} barSize={8}>
+                {filteredData.map((entry, i) => (
+                  <Cell key={`out-dram-${i}`} opacity={entry.isEstimate ? 0.5 : 1} />
+                ))}
+              </Bar>
+            )}
+
+            {/* Bit Growth (UBS) line */}
+            {showUbsGrowth && (
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="ubsGrowth"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                dot={(props: Record<string, unknown>) => {
+                  const { cx, cy, payload } = props as {
+                    cx: number;
+                    cy: number;
+                    payload: CombinedEntry;
+                  };
+                  if (!payload) return <circle key="empty" />;
+                  return (
+                    <circle
+                      key={`ubs-${payload.quarter}`}
+                      cx={cx}
+                      cy={cy}
+                      r={3}
+                      fill={payload.isEstimate ? (isDark ? '#1e293b' : '#fff') : '#f59e0b'}
+                      stroke="#f59e0b"
+                      strokeWidth={1.5}
+                    />
+                  );
+                }}
+                activeDot={{ r: 4, fill: '#f59e0b' }}
+              />
+            )}
+            {/* Bit Growth (TF) line */}
+            {showTfGrowth && (
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="tfGrowth"
+                stroke="#ef4444"
+                strokeWidth={2}
+                strokeDasharray="4 4"
+                dot={(props: Record<string, unknown>) => {
+                  const { cx, cy, payload } = props as {
+                    cx: number;
+                    cy: number;
+                    payload: CombinedEntry;
+                  };
+                  if (!payload) return <circle key="empty" />;
+                  return (
+                    <circle
+                      key={`tf-${payload.quarter}`}
+                      cx={cx}
+                      cy={cy}
+                      r={3}
+                      fill={payload.isEstimate ? (isDark ? '#1e293b' : '#fff') : '#ef4444'}
+                      stroke="#ef4444"
+                      strokeWidth={1.5}
+                    />
+                  );
+                }}
+                activeDot={{ r: 4, fill: '#ef4444' }}
+              />
+            )}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
 
       {/* Legend */}
       <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-[9px] text-gray-500 dark:text-gray-400">
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-1.5 w-2.5 rounded-sm bg-blue-500" />
-          In (Km²)
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-1.5 w-2.5 rounded-sm bg-emerald-500" />
-          Out (Km²)
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-1.5 w-2.5 rounded-sm bg-amber-500" />
-          Growth (%)
-        </span>
+        {showIn && !canSplit && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-1.5 w-2.5 rounded-sm bg-blue-500" />
+            In (UBS, Km²)
+          </span>
+        )}
+        {showIn && canSplit && (
+          <>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-1.5 w-2.5 rounded-sm bg-blue-500" />
+              In DRAM
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-1.5 w-2.5 rounded-sm bg-blue-300" />
+              In NAND
+            </span>
+          </>
+        )}
+        {showOut && !canSplit && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-1.5 w-2.5 rounded-sm bg-emerald-500" />
+            Out (TF, Km²)
+          </span>
+        )}
+        {showOut && canSplit && (
+          <>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-1.5 w-2.5 rounded-sm bg-emerald-500" />
+              Out DRAM
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-1.5 w-2.5 rounded-sm bg-emerald-300" />
+              Out NAND
+            </span>
+          </>
+        )}
+        {showUbsGrowth && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-1.5 w-2.5 rounded-sm bg-amber-500" />
+            Bit Growth (UBS)
+          </span>
+        )}
+        {showTfGrowth && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-1.5 w-2.5 rounded-sm bg-red-500" />
+            Bit Growth (TF)
+          </span>
+        )}
         <span className="text-gray-300 dark:text-gray-600">|</span>
         <span className="flex items-center gap-1">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-gray-400" />
@@ -390,83 +567,169 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
             </thead>
             <tbody>
               {/* Wafer In */}
-              <tr className="bg-white dark:bg-gray-800">
-                <td className="px-1.5 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: '#3b82f6' }}>
-                  Wafer In
-                </td>
-                {filteredData.map((d) => (
-                  <td key={d.quarter} className="px-1 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap text-gray-700 dark:border-gray-600 dark:text-gray-300">
-                    {d.waferIn.toLocaleString(undefined, { maximumFractionDigits: 1 })}
-                  </td>
-                ))}
-              </tr>
-              {/* Wafer In QoQ */}
-              <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
-                {filteredData.map((d, i) => {
-                  const prev = i > 0 ? filteredData[i - 1].waferIn : null;
-                  const qoq = prev && prev > 0 ? ((d.waferIn - prev) / prev) * 100 : null;
-                  const sign = qoq !== null && qoq > 0 ? '+' : '';
-                  const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
-                  return (
-                    <td key={d.quarter} className={`px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] dark:border-gray-600 ${color}`}>
-                      {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+              {showIn && (
+                <>
+                  <tr className="bg-white dark:bg-gray-800">
+                    <td className="px-1.5 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: '#3b82f6' }}>
+                      In (UBS)
                     </td>
-                  );
-                })}
-              </tr>
+                    {filteredData.map((d) => (
+                      <td key={d.quarter} className="px-1 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap text-gray-700 dark:border-gray-600 dark:text-gray-300">
+                        {d.waferIn.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                      </td>
+                    ))}
+                  </tr>
+                  {canSplit && (
+                    <>
+                      <tr className="bg-gray-50/30 dark:bg-gray-700/20">
+                        <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] whitespace-nowrap dark:border-gray-600" style={{ color: '#3b82f6', paddingLeft: 12 }}>
+                          DRAM
+                        </td>
+                        {filteredData.map((d) => (
+                          <td key={d.quarter} className="px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                            {d.waferInDram.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="bg-gray-50/30 dark:bg-gray-700/20">
+                        <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] whitespace-nowrap dark:border-gray-600" style={{ color: '#93c5fd', paddingLeft: 12 }}>
+                          NAND
+                        </td>
+                        {filteredData.map((d) => (
+                          <td key={d.quarter} className="px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                            {d.waferInNand.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                          </td>
+                        ))}
+                      </tr>
+                    </>
+                  )}
+                  <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                    <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                    {filteredData.map((d, i) => {
+                      const prev = i > 0 ? filteredData[i - 1].waferIn : null;
+                      const qoq = prev && prev > 0 ? ((d.waferIn - prev) / prev) * 100 : null;
+                      const sign = qoq !== null && qoq > 0 ? '+' : '';
+                      const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                      return (
+                        <td key={d.quarter} className={`px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] dark:border-gray-600 ${color}`}>
+                          {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </>
+              )}
               {/* Wafer Out */}
-              <tr className="bg-gray-50 dark:bg-gray-700">
-                <td className="px-1.5 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: '#10b981' }}>
-                  Wafer Out
-                </td>
-                {filteredData.map((d) => (
-                  <td key={d.quarter} className="px-1 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap text-gray-700 dark:border-gray-600 dark:text-gray-300">
-                    {d.waferOut.toLocaleString(undefined, { maximumFractionDigits: 1 })}
-                  </td>
-                ))}
-              </tr>
-              {/* Wafer Out QoQ */}
-              <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
-                {filteredData.map((d, i) => {
-                  const prev = i > 0 ? filteredData[i - 1].waferOut : null;
-                  const qoq = prev && prev > 0 ? ((d.waferOut - prev) / prev) * 100 : null;
-                  const sign = qoq !== null && qoq > 0 ? '+' : '';
-                  const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
-                  return (
-                    <td key={d.quarter} className={`px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] dark:border-gray-600 ${color}`}>
-                      {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+              {showOut && (
+                <>
+                  <tr className="bg-gray-50 dark:bg-gray-700">
+                    <td className="px-1.5 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: '#10b981' }}>
+                      Out (TF)
                     </td>
-                  );
-                })}
-              </tr>
-              {/* Bit Growth */}
-              <tr className="bg-white dark:bg-gray-800">
-                <td className="px-1.5 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: '#f59e0b' }}>
-                  Bit Growth
-                </td>
-                {filteredData.map((d) => (
-                  <td key={d.quarter} className="px-1 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap text-gray-700 dark:border-gray-600 dark:text-gray-300">
-                    {d.bitGrowth.toFixed(1)}%
-                  </td>
-                ))}
-              </tr>
-              {/* Bit Growth delta vs previous quarter */}
-              <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] text-gray-400 whitespace-nowrap dark:border-gray-600">전분기比</td>
-                {filteredData.map((d, i) => {
-                  const prev = i > 0 ? filteredData[i - 1].bitGrowth : null;
-                  const delta = prev !== null ? d.bitGrowth - prev : null;
-                  const sign = delta !== null && delta > 0 ? '+' : '';
-                  const color = delta === null ? 'text-gray-300 dark:text-gray-600' : delta > 0 ? 'text-red-500' : delta < 0 ? 'text-blue-500' : 'text-gray-400';
-                  return (
-                    <td key={d.quarter} className={`px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] dark:border-gray-600 ${color}`}>
-                      {delta !== null ? `${sign}${delta.toFixed(1)}%p` : '-'}
+                    {filteredData.map((d) => (
+                      <td key={d.quarter} className="px-1 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap text-gray-700 dark:border-gray-600 dark:text-gray-300">
+                        {d.waferOut.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                      </td>
+                    ))}
+                  </tr>
+                  {canSplit && (
+                    <>
+                      <tr className="bg-gray-50/30 dark:bg-gray-700/20">
+                        <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] whitespace-nowrap dark:border-gray-600" style={{ color: '#10b981', paddingLeft: 12 }}>
+                          DRAM
+                        </td>
+                        {filteredData.map((d) => (
+                          <td key={d.quarter} className="px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                            {d.waferOutDram.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="bg-gray-50/30 dark:bg-gray-700/20">
+                        <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] whitespace-nowrap dark:border-gray-600" style={{ color: '#6ee7b7', paddingLeft: 12 }}>
+                          NAND
+                        </td>
+                        {filteredData.map((d) => (
+                          <td key={d.quarter} className="px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                            {d.waferOutNand.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                          </td>
+                        ))}
+                      </tr>
+                    </>
+                  )}
+                  <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                    <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                    {filteredData.map((d, i) => {
+                      const prev = i > 0 ? filteredData[i - 1].waferOut : null;
+                      const qoq = prev && prev > 0 ? ((d.waferOut - prev) / prev) * 100 : null;
+                      const sign = qoq !== null && qoq > 0 ? '+' : '';
+                      const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                      return (
+                        <td key={d.quarter} className={`px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] dark:border-gray-600 ${color}`}>
+                          {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </>
+              )}
+              {/* Bit Growth (UBS) */}
+              {showUbsGrowth && (
+                <>
+                  <tr className="bg-white dark:bg-gray-800">
+                    <td className="px-1.5 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: '#f59e0b' }}>
+                      Bit Growth (UBS)
                     </td>
-                  );
-                })}
-              </tr>
+                    {filteredData.map((d) => (
+                      <td key={d.quarter} className="px-1 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap text-gray-700 dark:border-gray-600 dark:text-gray-300">
+                        {d.ubsGrowth.toFixed(1)}%
+                      </td>
+                    ))}
+                  </tr>
+                  <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                    <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] text-gray-400 whitespace-nowrap dark:border-gray-600">전분기比</td>
+                    {filteredData.map((d, i) => {
+                      const prev = i > 0 ? filteredData[i - 1].ubsGrowth : null;
+                      const delta = prev !== null ? d.ubsGrowth - prev : null;
+                      const sign = delta !== null && delta > 0 ? '+' : '';
+                      const color = delta === null ? 'text-gray-300 dark:text-gray-600' : delta > 0 ? 'text-red-500' : delta < 0 ? 'text-blue-500' : 'text-gray-400';
+                      return (
+                        <td key={d.quarter} className={`px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] dark:border-gray-600 ${color}`}>
+                          {delta !== null ? `${sign}${delta.toFixed(1)}%p` : '-'}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </>
+              )}
+              {/* Bit Growth (TF) */}
+              {showTfGrowth && (
+                <>
+                  <tr className="bg-gray-50 dark:bg-gray-700">
+                    <td className="px-1.5 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: '#ef4444' }}>
+                      Bit Growth (TF)
+                    </td>
+                    {filteredData.map((d) => (
+                      <td key={d.quarter} className="px-1 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap text-gray-700 dark:border-gray-600 dark:text-gray-300">
+                        {d.tfGrowth.toFixed(1)}%
+                      </td>
+                    ))}
+                  </tr>
+                  <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                    <td className="px-1.5 py-0.5 border border-gray-200 text-[9px] text-gray-400 whitespace-nowrap dark:border-gray-600">전분기比</td>
+                    {filteredData.map((d, i) => {
+                      const prev = i > 0 ? filteredData[i - 1].tfGrowth : null;
+                      const delta = prev !== null ? d.tfGrowth - prev : null;
+                      const sign = delta !== null && delta > 0 ? '+' : '';
+                      const color = delta === null ? 'text-gray-300 dark:text-gray-600' : delta > 0 ? 'text-red-500' : delta < 0 ? 'text-blue-500' : 'text-gray-400';
+                      return (
+                        <td key={d.quarter} className={`px-1 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[9px] dark:border-gray-600 ${color}`}>
+                          {delta !== null ? `${sign}${delta.toFixed(1)}%p` : '-'}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </>
+              )}
             </tbody>
           </table>
         </div>
