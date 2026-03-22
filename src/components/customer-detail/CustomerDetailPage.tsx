@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import type { CustomerDetailId } from '@/types/indicators';
-import { CUSTOMER_LIST, CUSTOMER_EXECUTIVES } from '@/data/customer-detail-mock';
+import { useState, useMemo } from 'react';
+import type { CustomerDetailId, IndustryMetric } from '@/types/indicators';
+import { useCustomerDetailData } from '@/hooks/useCustomerDetailData';
 import { useNews } from '@/hooks/useNews';
 import ExecutivePanel from './ExecutivePanel';
 import ExternalComparison from './ExternalComparison';
@@ -10,24 +10,58 @@ import EstimateTrendChart from './EstimateTrendChart';
 import CustomerNewsPanel from './CustomerNewsPanel';
 import WeeklySummary from './WeeklySummary';
 import MonthlyMetricsChart from './MonthlyMetricsChart';
-
-const memoryCustomers = CUSTOMER_LIST.filter((c) => c.type === 'memory');
-const foundryCustomers = CUSTOMER_LIST.filter((c) => c.type === 'foundry');
-const memoryAll = CUSTOMER_LIST.find((c) => c.id === 'Total_DRAM_NAND');
-const foundryAll = CUSTOMER_LIST.find((c) => c.id === 'Total_Foundry');
+import FinancialResultsTable from './FinancialResultsTable';
+import TranscriptSummary from './TranscriptSummary';
+import IndustryMetricsPanel from './IndustryMetricsPanel';
 
 export default function CustomerDetailPage() {
+  const { data: apiData, loading } = useCustomerDetailData();
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDetailId>('SEC');
   const [quarterRange, setQuarterRange] = useState<4 | 8 | 12>(8);
   const [showNews, setShowNews] = useState(false);
 
-  const data = CUSTOMER_EXECUTIVES[selectedCustomer];
+  const customerList = apiData?.customerList ?? [];
+  const memoryCustomers = customerList.filter((c) => c.type === 'memory');
+  const foundryCustomers = customerList.filter((c) => c.type === 'foundry');
+  const memoryAll = customerList.find((c) => c.id === 'Total_DRAM_NAND');
+  const foundryAll = customerList.find((c) => c.id === 'Total_Foundry');
 
-  const { articles, answer, loading, error } = useNews(
-    data.newsQueryKo ?? null,
-    data.newsQueryEn ?? null,
-    data.label,
+  const data = apiData?.customers[selectedCustomer];
+
+  // Collect unique foundry industry metrics when Total_Foundry is selected (dedupe by metricId)
+  const allFoundryMetrics = useMemo((): IndustryMetric[] | undefined => {
+    if (selectedCustomer !== 'Total_Foundry' || !apiData?.customers) return undefined;
+    const foundryIds = ['SEC_Foundry', 'TSMC', 'SMC', 'GFS', 'STM', 'Intel'] as CustomerDetailId[];
+    const seen = new Set<string>();
+    const metrics: IndustryMetric[] = [];
+    for (const id of foundryIds) {
+      const cust = apiData.customers[id];
+      if (cust?.industryMetrics && cust.industryMetrics.length > 0) {
+        cust.industryMetrics.forEach((m) => {
+          if (!seen.has(m.id)) {
+            seen.add(m.id);
+            metrics.push(m);
+          }
+        });
+      }
+    }
+    return metrics.length > 0 ? metrics : undefined;
+  }, [selectedCustomer, apiData]);
+
+  // useNews must be called unconditionally — use safe fallbacks when data not yet loaded
+  const { articles, answer, loading: newsLoading, error } = useNews(
+    data?.newsQueryKo ?? null,
+    data?.newsQueryEn ?? null,
+    data?.label,
   );
+
+  if (loading || !data) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
+      </div>
+    );
+  }
 
   const fallbackArticles = data.news.map((n) => ({
     title: n.title,
@@ -143,7 +177,7 @@ export default function CustomerDetailPage() {
       {/* Main content — 2/3 center + 1/3 right */}
       <div className="flex min-h-0 flex-1">
         {/* Center (2/3) */}
-        <div className="flex w-1/2 flex-col gap-4 overflow-y-auto border-r border-gray-200 p-4 dark:border-gray-700">
+        <div className="flex w-[70%] flex-col gap-4 overflow-y-auto border-r border-gray-200 p-4 dark:border-gray-700">
           <ExecutivePanel data={data} />
           <MonthlyMetricsChart
             data={data.monthlyMetrics}
@@ -151,6 +185,7 @@ export default function CustomerDetailPage() {
             versionLabel={data.versionLabel}
             prevVersionLabel={data.prevVersionLabel}
             customerType={data.type}
+            customerId={selectedCustomer}
             quarterRange={quarterRange}
             onQuarterRangeChange={setQuarterRange}
           />
@@ -163,7 +198,13 @@ export default function CustomerDetailPage() {
         </div>
 
         {/* Right */}
-        <div className="flex w-1/2 flex-col gap-4 overflow-y-auto p-4">
+        <div className="flex w-[30%] flex-col gap-4 overflow-x-auto overflow-y-auto p-4">
+          {selectedCustomer !== 'Total_DRAM_NAND' && selectedCustomer !== 'Total_Foundry' && data.financials && data.financials.length > 0 && (
+            <FinancialResultsTable financials={data.financials} customerId={selectedCustomer} customerLabel={data.label} />
+          )}
+          {selectedCustomer !== 'Total_DRAM_NAND' && selectedCustomer !== 'Total_Foundry' && (
+            <TranscriptSummary customerId={selectedCustomer} customerLabel={data.label} transcript={data.transcript} />
+          )}
           <ExternalComparison
             data={data.externalComparison}
             waferInOutData={data.waferInOutQuarterly}
@@ -171,15 +212,17 @@ export default function CustomerDetailPage() {
             quarterRange={quarterRange}
             onQuarterRangeChange={setQuarterRange}
             customerType={data.type}
+            customerId={selectedCustomer}
+            industryMetrics={selectedCustomer === 'Total_Foundry' ? allFoundryMetrics : data.industryMetrics}
           />
           {data.estimateTrend && (
-            <EstimateTrendChart data={data.estimateTrend} />
+            <EstimateTrendChart data={data.estimateTrend} customerId={selectedCustomer} />
           )}
           {showNews && (
             <CustomerNewsPanel
               articles={newsArticles}
               answer={answer}
-              loading={loading}
+              loading={newsLoading}
               error={error}
               customerLabel={newsLabel}
             />

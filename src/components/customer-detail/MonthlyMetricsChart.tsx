@@ -24,6 +24,7 @@ interface Props {
   versionLabel?: string;
   prevVersionLabel?: string;
   customerType?: 'memory' | 'foundry';
+  customerId?: string;
   quarterRange: 4 | 8 | 12;
   onQuarterRangeChange: (range: 4 | 8 | 12) => void;
 }
@@ -35,9 +36,9 @@ const LIGHT_COLORS: Record<string, string> = {
 };
 
 const BAR_METRICS: { key: MetricKey; label: string; color: string; unit: string }[] = [
-  { key: 'waferInput', label: '투입량', color: '#3B82F6', unit: 'Km²' },
-  { key: 'purchaseVolume', label: '구매량', color: '#10B981', unit: 'Km²' },
-  { key: 'capa', label: 'Capa', color: '#8B5CF6', unit: 'Km²' },
+  { key: 'waferInput', label: '투입량', color: '#3B82F6', unit: 'K/M' },
+  { key: 'purchaseVolume', label: '구매량', color: '#10B981', unit: 'K/M' },
+  { key: 'capa', label: 'Capa', color: '#8B5CF6', unit: 'K/M' },
 ];
 
 const LINE_METRICS: { key: MetricKey; label: string; color: string; unit: string }[] = [
@@ -139,7 +140,7 @@ function formatGrowth(v: number | null): { text: string; color: string } {
   const sign = v > 0 ? '+' : '';
   return {
     text: `${sign}${v.toFixed(1)}%`,
-    color: v > 0 ? 'text-red-500' : v < 0 ? 'text-blue-500' : 'text-gray-400',
+    color: v > 0 ? 'text-blue-500' : v < 0 ? 'text-red-500' : 'text-gray-400',
   };
 }
 
@@ -149,6 +150,7 @@ export default function MonthlyMetricsChart({
   versionLabel = '최신 집계',
   prevVersionLabel = '이전 집계',
   customerType,
+  customerId,
   quarterRange,
   onQuarterRangeChange,
 }: Props) {
@@ -214,9 +216,10 @@ export default function MonthlyMetricsChart({
   );
 
   const isMemory = customerType === 'memory';
+  const isKoxia = customerId === 'Koxia';
   const hasDramRatio = enrichedData.some(d => d.dramRatio !== undefined);
-  const canSplit = isMemory && hasDramRatio && waferFilter === 'all';
-  const canFilter = isMemory && hasDramRatio;
+  const canSplit = isMemory && !isKoxia && hasDramRatio && waferFilter === 'all';
+  const canFilter = isMemory && !isKoxia && hasDramRatio;
   const hasVersionData = !!prevVersionData && prevVersionData.length > 0;
 
   // Apply DRAM/NAND filter to data (for 'dram' or 'nand' selections)
@@ -319,18 +322,21 @@ export default function MonthlyMetricsChart({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">
-          Wafer 주요 지표 Chart
-        </h3>
+      {/* Row 1: Title */}
+      <h3 className="mb-1 text-sm font-bold text-gray-800 dark:text-gray-100">
+        Wafer 주요 지표 Chart
+      </h3>
+      {/* Row 2: Controls — consistent layout regardless of customer type */}
+      <div className="mb-3 flex flex-wrap items-center gap-1">
+        {/* Version compare toggle — always first position */}
         {hasVersionData && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 border-r border-gray-200 pr-2 dark:border-gray-600">
             <button
               onClick={() => setShowVersionCompare(!showVersionCompare)}
-              className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors ${
+              className={`rounded-md px-3 py-1 text-[10px] font-bold transition-colors ${
                 showVersionCompare
                   ? 'bg-orange-500 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300'
               }`}
             >
               전월조사 비교
@@ -344,83 +350,83 @@ export default function MonthlyMetricsChart({
             )}
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-1">
-          {ALL_METRICS.map((opt) => (
+
+        {/* Metric toggles */}
+        {ALL_METRICS.map((opt) => (
+          <button
+            key={opt.key}
+            onClick={() => toggleMetric(opt.key)}
+            className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-colors ${
+              selectedMetrics.includes(opt.key)
+                ? 'text-white shadow-sm'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
+            }`}
+            style={selectedMetrics.includes(opt.key) ? { backgroundColor: opt.color } : undefined}
+          >
+            {opt.label}
+          </button>
+        ))}
+
+        {/* Period selector */}
+        <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-600">
+          {TIME_PRESETS.map((preset) => (
             <button
-              key={opt.key}
-              onClick={() => toggleMetric(opt.key)}
-              className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-colors ${
-                selectedMetrics.includes(opt.key)
-                  ? 'text-white shadow-sm'
+              key={preset.value}
+              onClick={() => onQuarterRangeChange(preset.value)}
+              className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                quarterRange === preset.value
+                  ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-800'
                   : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
               }`}
-              style={selectedMetrics.includes(opt.key) ? { backgroundColor: opt.color } : undefined}
             >
-              {opt.label}
+              {preset.label}
             </button>
           ))}
-
-          {/* Period selector */}
-          <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-600">
-            {TIME_PRESETS.map((preset) => (
-              <button
-                key={preset.value}
-                onClick={() => onQuarterRangeChange(preset.value)}
-                className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                  quarterRange === preset.value
-                    ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-800'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Granularity toggle */}
-          <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-600">
-            {([
-              { key: 'monthly', label: '월별' },
-              { key: 'quarterly', label: '분기별' },
-              { key: 'yearly', label: '년도별' },
-            ] as { key: TimeGranularity; label: string }[]).map((g) => (
-              <button
-                key={g.key}
-                onClick={() => setGranularity(g.key)}
-                className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                  granularity === g.key
-                    ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-800'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
-                }`}
-              >
-                {g.label}
-              </button>
-            ))}
-          </div>
-
-          {/* DRAM/NAND filter */}
-          {canFilter && (
-            <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-600">
-              {(['all', 'dram', 'nand'] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setWaferFilter(f)}
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                    waferFilter === f
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
-                  }`}
-                >
-                  {f === 'all' ? 'ALL' : f.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
+
+        {/* Granularity toggle */}
+        <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-600">
+          {([
+            { key: 'monthly', label: '월별' },
+            { key: 'quarterly', label: '분기별' },
+            { key: 'yearly', label: '년도별' },
+          ] as { key: TimeGranularity; label: string }[]).map((g) => (
+            <button
+              key={g.key}
+              onClick={() => setGranularity(g.key)}
+              className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                granularity === g.key
+                  ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-800'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
+              }`}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+
+        {/* DRAM/NAND filter — only for memory customers with dramRatio */}
+        {canFilter && (
+          <div className="flex items-center gap-1 border-l border-gray-200 pl-2 dark:border-gray-600">
+            {(['all', 'dram', 'nand'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setWaferFilter(f)}
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                  waferFilter === f
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
+                }`}
+              >
+                {f === 'all' ? 'ALL' : f.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <ResponsiveContainer width="100%" height={240}>
-        <ComposedChart data={chartData} margin={{ top: 20, right: 8, bottom: 0, left: -8 }}>
+        <ComposedChart data={chartData} margin={{ top: 20, right: 8, bottom: 0, left: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
           <XAxis
             dataKey="month"
@@ -433,6 +439,7 @@ export default function MonthlyMetricsChart({
             tick={{ fontSize: 11, fill: tickFill }}
             axisLine={false}
             tickLine={false}
+            label={{ value: activeBarMetrics[0]?.unit ?? 'K/M', angle: -90, position: 'insideLeft', offset: 10, fontSize: 10, fill: tickFill }}
           />
           {activeLineMetrics.length > 0 && (
             <YAxis
@@ -441,6 +448,7 @@ export default function MonthlyMetricsChart({
               tick={{ fontSize: 11, fill: tickFill }}
               axisLine={false}
               tickLine={false}
+              label={{ value: activeLineMetrics[0]?.unit ?? '%', angle: 90, position: 'insideRight', offset: 10, fontSize: 10, fill: tickFill }}
             />
           )}
           <Tooltip
@@ -449,6 +457,11 @@ export default function MonthlyMetricsChart({
                 ? { fontSize: 12, borderRadius: 8, backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' }
                 : { fontSize: 12, backgroundColor: 'rgba(255,255,255,0.95)', border: '1px solid #e5e7eb', borderRadius: 8 }
             }
+            formatter={(value: unknown, name?: string) => {
+              const metric = activeMetrics.find((m) => `${m.label} (${m.unit})` === name);
+              const unit = metric?.unit ?? '';
+              return [`${Number(value).toLocaleString(undefined, { maximumFractionDigits: 1 })} ${unit}`, name];
+            }}
           />
           <Legend wrapperStyle={{ fontSize: 11 }} />
 
@@ -630,7 +643,7 @@ export default function MonthlyMetricsChart({
                         className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600"
                         style={{ color: metric.color }}
                       >
-                        {metric.label}
+                        {metric.label} ({metric.unit})
                       </td>
                       {displayData.map((d) => (
                         <td
@@ -671,7 +684,7 @@ export default function MonthlyMetricsChart({
                           if (prev === undefined) return <td key={d.month} className="px-1.5 py-0.5 border border-gray-200 text-right text-[10px] text-gray-300 dark:border-gray-600">-</td>;
                           const diff = curr - prev;
                           const sign = diff > 0 ? '+' : '';
-                          const color = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-blue-500' : 'text-gray-400';
+                          const color = diff > 0 ? 'text-blue-500' : diff < 0 ? 'text-red-500' : 'text-gray-400';
                           return (
                             <td key={d.month} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
                               {sign}{diff.toFixed(1)}

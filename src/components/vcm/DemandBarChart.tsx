@@ -2,8 +2,9 @@
 
 import { useState, useMemo } from 'react';
 import {
-  BarChart,
+  ComposedChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -11,6 +12,7 @@ import {
   Cell,
   LabelList,
   ReferenceLine,
+  Legend,
 } from 'recharts';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import type { TimeRange } from './TotalWaferLineChart';
@@ -37,6 +39,8 @@ interface DemandBarChartProps {
   secondaryData?: DataPoint[];
   secondaryLabel?: string;
   secondaryColor?: string;
+  lineData?: QuarterlyValue[];
+  lineColor?: string;
   timeRange: TimeRange;
   onTimeRangeChange: (range: TimeRange) => void;
   mountData?: MountDataItem[];
@@ -66,6 +70,11 @@ function formatTableValue(value: number): string {
   return String(value);
 }
 
+function formatLineValue(value: number): string {
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return value.toFixed(1);
+}
+
 function getYear(quarter: string): string {
   const match = quarter.match(/'(\d{2})$/);
   return match ? `20${match[1]}` : '';
@@ -84,12 +93,14 @@ export default function DemandBarChart({
   secondaryData,
   secondaryLabel,
   secondaryColor = '#8b5cf6',
+  lineData,
+  lineColor = '#f97316',
   timeRange,
   onTimeRangeChange,
   mountData,
 }: DemandBarChartProps) {
   const { isDark } = useDarkMode();
-  const [showQoQ, setShowQoQ] = useState(true);
+  const [showQoQ, setShowQoQ] = useState(false);
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
   const labelFill = isDark ? '#cbd5e1' : '#374151';
   const tooltipStyle = isDark
@@ -97,6 +108,7 @@ export default function DemandBarChart({
     : { fontSize: 13, borderRadius: 6 };
 
   const hasDualBars = !!secondaryData && secondaryData.length > 0;
+  const hasLine = !!lineData && lineData.length > 0;
 
   // Find current boundary (last non-estimate)
   const currentIdx = useMemo(() => {
@@ -127,6 +139,15 @@ export default function DemandBarChart({
     });
   }, [secondaryData, hasDualBars, filteredData]);
 
+  // Line data aligned to same quarters
+  const filteredLine = useMemo(() => {
+    if (!hasLine || !lineData) return undefined;
+    return filteredData.map((d) => {
+      const match = lineData.find((l) => l.quarter === d.quarter);
+      return match ?? { quarter: d.quarter, value: 0, isEstimate: d.isEstimate };
+    });
+  }, [lineData, hasLine, filteredData]);
+
   const boundaryQuarter = currentIdx >= 0 ? data[currentIdx]?.quarter : undefined;
 
   // Combined chart data for Recharts
@@ -136,10 +157,11 @@ export default function DemandBarChart({
       isEstimate: d.isEstimate,
       primary: d.value,
       ...(filteredSecondary ? { secondary: filteredSecondary[i]?.value ?? 0 } : {}),
+      ...(filteredLine ? { waferLine: filteredLine[i]?.value ?? null } : {}),
     }));
-  }, [filteredData, filteredSecondary]);
+  }, [filteredData, filteredSecondary, filteredLine]);
 
-  // Dynamic Y-axis with tight domain
+  // Left Y-axis domain (bar data — device sales)
   const yDomain = useMemo(() => {
     if (chartData.length === 0) return [0, 100];
     const values = chartData.flatMap((d) => {
@@ -154,6 +176,18 @@ export default function DemandBarChart({
     const top = Math.ceil((max + padding) / 1000) * 1000;
     return [bottom, top];
   }, [chartData]);
+
+  // Right Y-axis domain (wafer line)
+  const yDomainRight = useMemo(() => {
+    if (!filteredLine || filteredLine.length === 0) return [0, 100];
+    const values = filteredLine.map((d) => d.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const padding = (max - min) * 0.2;
+    const bottom = Math.max(0, Math.floor((min - padding) / 10) * 10);
+    const top = Math.ceil((max + padding) / 10) * 10;
+    return [bottom, top];
+  }, [filteredLine]);
 
   // Year labels above chart
   const yearLabels = useMemo(() => {
@@ -186,6 +220,13 @@ export default function DemandBarChart({
     });
     return groups;
   }, [filteredData]);
+
+  // Wafer demand rows from mountData (group === 'wafer') or the wafer line data
+  // Table row order: Wafer수요(월평균) → 기기판매량 → 대당탑재량
+  const waferRows = useMemo(() => mountData?.filter((m) => m.group === ('wafer' as string)) ?? [], [mountData]);
+  const primaryMountRows = useMemo(() => mountData?.filter((m) => m.group === 'primary') ?? [], [mountData]);
+  const secondaryMountRows = useMemo(() => mountData?.filter((m) => m.group === 'secondary') ?? [], [mountData]);
+  const ungroupedRows = useMemo(() => mountData?.filter((m) => !m.group) ?? [], [mountData]);
 
   return (
     <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800" style={{ minHeight: 540 }}>
@@ -223,7 +264,7 @@ export default function DemandBarChart({
 
       {/* Year group labels */}
       {yearLabels.length > 1 && (
-        <div className="mb-1 flex" style={{ marginLeft: 50, marginRight: 8 }}>
+        <div className="mb-1 flex" style={{ marginLeft: 50, marginRight: hasLine ? 50 : 8 }}>
           {yearLabels.map((yl) => {
             const span = yl.endIdx - yl.startIdx + 1;
             const widthPct = (span / filteredData.length) * 100;
@@ -240,23 +281,40 @@ export default function DemandBarChart({
         </div>
       )}
 
-      {/* Legend for dual bars */}
-      {hasDualBars && (
-        <div className="mb-1 flex items-center justify-center gap-4 text-[11px]">
+      {/* Legend */}
+      <div className="mb-1 flex items-center justify-center gap-4 text-[11px]">
+        {hasDualBars ? (
+          <>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: barColor }} />
+              <span className="text-gray-600 dark:text-gray-400">{barLabel ?? '기기판매량(ea)'}</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: secondaryColor }} />
+              <span className="text-gray-600 dark:text-gray-400">{secondaryLabel}</span>
+            </span>
+          </>
+        ) : (
           <span className="flex items-center gap-1">
             <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: barColor }} />
-            <span className="text-gray-600 dark:text-gray-400">{barLabel}</span>
+            <span className="text-gray-600 dark:text-gray-400">{barLabel ?? '기기판매량(ea)'}</span>
           </span>
+        )}
+        {hasLine && (
           <span className="flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: secondaryColor }} />
-            <span className="text-gray-600 dark:text-gray-400">{secondaryLabel}</span>
+            <span className="inline-block h-0.5 w-4" style={{ backgroundColor: lineColor }} />
+            <span className="text-gray-600 dark:text-gray-400">Wafer 수요 (월평균)</span>
           </span>
-        </div>
-      )}
+        )}
+      </div>
 
+      <div className="flex items-center justify-between px-1 mb-0.5">
+        <span className="text-[8px] text-gray-400 dark:text-gray-500">기기판매량(ea)</span>
+        {hasLine && <span className="text-[8px]" style={{ color: lineColor }}>Wafer수요(K/M)</span>}
+      </div>
       <div style={{ height: 240 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 20, right: 8, left: 8, bottom: 4 }}>
+          <ComposedChart data={chartData} margin={{ top: 20, right: hasLine ? 24 : 8, left: 12, bottom: 4 }}>
             <XAxis
               dataKey="quarter"
               tick={{ fontSize: 11, fill: tickFill }}
@@ -264,6 +322,7 @@ export default function DemandBarChart({
               tickLine={false}
             />
             <YAxis
+              yAxisId="left"
               domain={yDomain}
               tickFormatter={formatYAxis}
               tick={{ fontSize: 11, fill: tickFill }}
@@ -271,15 +330,29 @@ export default function DemandBarChart({
               tickLine={false}
               width={42}
             />
+            {hasLine && (
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                domain={yDomainRight}
+                tickFormatter={formatLineValue}
+                tick={{ fontSize: 10, fill: lineColor }}
+                axisLine={false}
+                tickLine={false}
+                width={44}
+              />
+            )}
             <Tooltip
               formatter={(value, name) => {
-                const label = name === 'secondary' ? (secondaryLabel ?? 'Secondary') : (barLabel ?? title);
-                return [Number(value).toLocaleString(), label];
+                if (name === 'waferLine') return [formatLineValue(Number(value)), 'Wafer 수요 (월평균)'];
+                if (name === 'secondary') return [Number(value).toLocaleString(), secondaryLabel ?? 'Secondary'];
+                return [Number(value).toLocaleString(), barLabel ?? '기기판매량'];
               }}
               contentStyle={tooltipStyle}
             />
             {boundaryQuarter && filteredData.some((d) => d.quarter === boundaryQuarter) && (
               <ReferenceLine
+                yAxisId="left"
                 x={boundaryQuarter}
                 stroke={isDark ? '#fbbf24' : '#dc2626'}
                 strokeDasharray="4 4"
@@ -313,7 +386,7 @@ export default function DemandBarChart({
                 }}
               />
             )}
-            <Bar dataKey="primary" radius={hasDualBars ? [2, 2, 0, 0] : [3, 3, 0, 0]}>
+            <Bar yAxisId="left" dataKey="primary" radius={hasDualBars ? [2, 2, 0, 0] : [3, 3, 0, 0]}>
               <LabelList
                 dataKey="primary"
                 position="top"
@@ -329,7 +402,7 @@ export default function DemandBarChart({
               ))}
             </Bar>
             {hasDualBars && (
-              <Bar dataKey="secondary" radius={[2, 2, 0, 0]}>
+              <Bar yAxisId="left" dataKey="secondary" radius={[2, 2, 0, 0]}>
                 <LabelList
                   dataKey="secondary"
                   position="top"
@@ -345,11 +418,23 @@ export default function DemandBarChart({
                 ))}
               </Bar>
             )}
-          </BarChart>
+            {hasLine && (
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="waferLine"
+                stroke={lineColor}
+                strokeWidth={2}
+                dot={{ r: 3, fill: lineColor, strokeWidth: 0 }}
+                activeDot={{ r: 5 }}
+                connectNulls
+              />
+            )}
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Data table — year-merged header + mount per unit rows */}
+      {/* Data table — year-merged header + rows */}
       {filteredData.length > 0 && (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-xs border-collapse">
@@ -385,160 +470,336 @@ export default function DemandBarChart({
               </tr>
             </thead>
             <tbody>
-              {/* Primary demand row */}
-              <tr className="bg-white dark:bg-gray-800">
-                <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: barColor }}>
-                  {hasDualBars ? barLabel : '수요'}
-                </td>
-                {filteredData.map((d) => (
-                  <td
-                    key={d.quarter}
-                    className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
-                      d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    {formatTableValue(d.value)}
-                  </td>
-                ))}
-              </tr>
-              {/* Primary QoQ */}
-              {showQoQ && (
-                <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
-                  {filteredData.map((d, i) => {
-                    const prev = i > 0 ? filteredData[i - 1].value : null;
-                    const qoq = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
-                    const sign = qoq !== null && qoq > 0 ? '+' : '';
-                    const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
-                    return (
-                      <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
-                        {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+              {/* ── SERVER / AUTOMOTIVE dual-bar section ── */}
+              {hasDualBars ? (
+                <>
+                  {/* Combined Wafer 수요 (월평균) row — from waferRows (group='wafer') */}
+                  {waferRows.map((mount) => (
+                    <tr key={mount.label} className="bg-gray-100 dark:bg-gray-600">
+                      <td className="px-2 py-1.5 border border-gray-200 font-bold whitespace-nowrap dark:border-gray-600 text-xs" style={{ color: '#111827' }}>
+                        {mount.label}
                       </td>
-                    );
-                  })}
-                </tr>
-              )}
-              {/* Primary CAGR (12Q only) */}
-              {timeRange === 12 && (() => {
-                const vals = filteredData.map((d) => d.value);
-                const first = vals[0];
-                const last = vals[vals.length - 1];
-                const years = (filteredData.length - 1) / 4;
-                const cagr = first > 0 && last > 0 && years > 0 ? (Math.pow(last / first, 1 / years) - 1) * 100 : null;
-                return (
-                  <tr className="bg-blue-50/50 dark:bg-blue-900/20">
-                    <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
-                    <td
-                      colSpan={filteredData.length}
-                      className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400"
-                    >
-                      {cagr !== null ? `${cagr > 0 ? '+' : ''}${cagr.toFixed(1)}%` : '-'}
-                    </td>
-                  </tr>
-                );
-              })()}
-              {/* Primary mount row (Trad. 탑재량) — right after primary demand */}
-              {mountData?.filter((m) => m.group === 'primary').map((mount) => (
-                <tr key={mount.label} className="bg-gray-50 dark:bg-gray-700">
-                  <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: mount.color }}>
-                    {mount.label}
-                  </td>
-                  {filteredData.map((d) => {
-                    const mv = mount.data.find((v) => v.quarter === d.quarter);
-                    return (
-                      <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
-                        {mv ? (mv.value >= 1 ? mv.value.toFixed(2) : mv.value.toFixed(3)) : '-'}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-              {/* Secondary demand row (AI Server) */}
-              {hasDualBars && filteredSecondary && (
-                <tr className="bg-white dark:bg-gray-800">
-                  <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: secondaryColor }}>
-                    {secondaryLabel}
-                  </td>
-                  {filteredSecondary.map((d) => (
-                    <td
-                      key={d.quarter}
-                      className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
-                        d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
-                      }`}
-                    >
-                      {formatTableValue(d.value)}
-                    </td>
+                      {filteredData.map((d) => {
+                        const mv = mount.data.find((v) => v.quarter === d.quarter);
+                        return (
+                          <td key={d.quarter} className={`px-1.5 py-1.5 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-xs font-bold ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}>
+                            {mv ? formatLineValue(mv.value) : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
                   ))}
-                </tr>
-              )}
-              {/* Secondary QoQ */}
-              {showQoQ && hasDualBars && filteredSecondary && (
-                <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
-                  {filteredSecondary.map((d, i) => {
-                    const prev = i > 0 ? filteredSecondary[i - 1].value : null;
-                    const qoq = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
-                    const sign = qoq !== null && qoq > 0 ? '+' : '';
-                    const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
-                    return (
-                      <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
-                        {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                  {/* Wafer 수요 QoQ */}
+                  {showQoQ && waferRows.map((mount) => (
+                    <tr key={`${mount.label}-qoq`} className="bg-gray-50/50 dark:bg-gray-700/30">
+                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                      {filteredData.map((d, i) => {
+                        const curr = mount.data.find((v) => v.quarter === d.quarter)?.value ?? 0;
+                        const prevQ = i > 0 ? (mount.data.find((v) => v.quarter === filteredData[i - 1].quarter)?.value ?? 0) : 0;
+                        const qoq = i > 0 && prevQ > 0 ? ((curr - prevQ) / prevQ) * 100 : null;
+                        const sign = qoq !== null && qoq > 0 ? '+' : '';
+                        const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-blue-500' : qoq < 0 ? 'text-red-500' : 'text-gray-400';
+                        return (
+                          <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                            {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+
+                  {/* PRIMARY GROUP: 기기판매량 → 대당탑재량 */}
+
+                  {/* Primary Wafer rows from mountData (legacy subgroup='wafer' fallback) */}
+                  {primaryMountRows.filter((m) => (m as MountDataItem & { subgroup?: string }).subgroup === 'wafer').map((mount) => (
+                    <tr key={mount.label} className="bg-orange-50/40 dark:bg-orange-900/10">
+                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: lineColor }}>
+                        {mount.label}
                       </td>
-                    );
-                  })}
-                </tr>
-              )}
-              {/* Secondary CAGR (12Q only) */}
-              {timeRange === 12 && hasDualBars && filteredSecondary && (() => {
-                const vals = filteredSecondary.map((d) => d.value);
-                const first = vals[0];
-                const last = vals[vals.length - 1];
-                const years = (filteredSecondary.length - 1) / 4;
-                const cagr = first > 0 && last > 0 && years > 0 ? (Math.pow(last / first, 1 / years) - 1) * 100 : null;
-                return (
-                  <tr className="bg-blue-50/50 dark:bg-blue-900/20">
-                    <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
-                    <td
-                      colSpan={filteredSecondary.length}
-                      className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400"
-                    >
-                      {cagr !== null ? `${cagr > 0 ? '+' : ''}${cagr.toFixed(1)}%` : '-'}
+                      {filteredData.map((d) => {
+                        const mv = mount.data.find((v) => v.quarter === d.quarter);
+                        return (
+                          <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                            {mv ? formatLineValue(mv.value) : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+
+                  {/* Primary demand (기기판매량) */}
+                  <tr className="bg-white dark:bg-gray-800">
+                    <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: barColor }}>
+                      {barLabel ?? '기기판매량(ea)'}
                     </td>
+                    {filteredData.map((d) => (
+                      <td
+                        key={d.quarter}
+                        className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
+                          d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        {formatTableValue(d.value)}
+                      </td>
+                    ))}
                   </tr>
-                );
-              })()}
-              {/* Secondary mount row (AI 탑재량) — right after secondary demand */}
-              {mountData?.filter((m) => m.group === 'secondary').map((mount) => (
-                <tr key={mount.label} className="bg-gray-50 dark:bg-gray-700">
-                  <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: mount.color }}>
-                    {mount.label}
-                  </td>
-                  {filteredData.map((d) => {
-                    const mv = mount.data.find((v) => v.quarter === d.quarter);
+                  {showQoQ && (
+                    <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                      {filteredData.map((d, i) => {
+                        const prev = i > 0 ? filteredData[i - 1].value : null;
+                        const qoq = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
+                        const sign = qoq !== null && qoq > 0 ? '+' : '';
+                        const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                        return (
+                          <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                            {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )}
+                  {timeRange === 12 && (() => {
+                    const vals = filteredData.map((d) => d.value);
+                    const first = vals[0];
+                    const last = vals[vals.length - 1];
+                    const years = (filteredData.length - 1) / 4;
+                    const cagr = first > 0 && last > 0 && years > 0 ? (Math.pow(last / first, 1 / years) - 1) * 100 : null;
                     return (
-                      <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
-                        {mv ? (mv.value >= 1 ? mv.value.toFixed(2) : mv.value.toFixed(3)) : '-'}
-                      </td>
+                      <tr className="bg-blue-50/50 dark:bg-blue-900/20">
+                        <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
+                        <td colSpan={filteredData.length} className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400">
+                          {cagr !== null ? `${cagr > 0 ? '+' : ''}${cagr.toFixed(1)}%` : '-'}
+                        </td>
+                      </tr>
                     );
-                  })}
-                </tr>
-              ))}
-              {/* Ungrouped mount rows (non-server apps) */}
-              {mountData?.filter((m) => !m.group).map((mount, mIdx) => (
-                <tr key={mount.label} className={mIdx % 2 === 0 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800'}>
-                  <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: mount.color }}>
-                    {mount.label}
-                  </td>
-                  {filteredData.map((d) => {
-                    const mv = mount.data.find((v) => v.quarter === d.quarter);
+                  })()}
+
+                  {/* Primary 대당탑재량 */}
+                  {primaryMountRows.filter((m) => !(m as MountDataItem & { subgroup?: string }).subgroup).map((mount) => (
+                    <tr key={mount.label} className="bg-gray-50 dark:bg-gray-700">
+                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: mount.color }}>
+                        {mount.label}
+                      </td>
+                      {filteredData.map((d) => {
+                        const mv = mount.data.find((v) => v.quarter === d.quarter);
+                        return (
+                          <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                            {mv ? (mv.value >= 1 ? mv.value.toFixed(2) : mv.value.toFixed(3)) : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+
+                  {/* SECONDARY GROUP: Wafer수요(월평균) → 기기판매량 → 대당탑재량 */}
+
+                  {/* Secondary Wafer rows */}
+                  {secondaryMountRows.filter((m) => (m as MountDataItem & { subgroup?: string }).subgroup === 'wafer').map((mount) => (
+                    <tr key={mount.label} className="bg-orange-50/40 dark:bg-orange-900/10">
+                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: lineColor }}>
+                        {mount.label}
+                      </td>
+                      {filteredData.map((d) => {
+                        const mv = mount.data.find((v) => v.quarter === d.quarter);
+                        return (
+                          <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                            {mv ? formatLineValue(mv.value) : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+
+                  {/* Secondary demand (기기판매량) */}
+                  {filteredSecondary && (
+                    <tr className="bg-white dark:bg-gray-800">
+                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: secondaryColor }}>
+                        {secondaryLabel}
+                      </td>
+                      {filteredSecondary.map((d) => (
+                        <td
+                          key={d.quarter}
+                          className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
+                            d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          {formatTableValue(d.value)}
+                        </td>
+                      ))}
+                    </tr>
+                  )}
+                  {showQoQ && filteredSecondary && (
+                    <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                      {filteredSecondary.map((d, i) => {
+                        const prev = i > 0 ? filteredSecondary[i - 1].value : null;
+                        const qoq = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
+                        const sign = qoq !== null && qoq > 0 ? '+' : '';
+                        const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                        return (
+                          <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                            {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )}
+                  {timeRange === 12 && filteredSecondary && (() => {
+                    const vals = filteredSecondary.map((d) => d.value);
+                    const first = vals[0];
+                    const last = vals[vals.length - 1];
+                    const years = (filteredSecondary.length - 1) / 4;
+                    const cagr = first > 0 && last > 0 && years > 0 ? (Math.pow(last / first, 1 / years) - 1) * 100 : null;
                     return (
-                      <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
-                        {mv ? (mv.value >= 1 ? mv.value.toFixed(2) : mv.value.toFixed(3)) : '-'}
-                      </td>
+                      <tr className="bg-blue-50/50 dark:bg-blue-900/20">
+                        <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
+                        <td colSpan={filteredSecondary.length} className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400">
+                          {cagr !== null ? `${cagr > 0 ? '+' : ''}${cagr.toFixed(1)}%` : '-'}
+                        </td>
+                      </tr>
                     );
-                  })}
-                </tr>
-              ))}
+                  })()}
+                  {/* Secondary 대당탑재량 */}
+                  {secondaryMountRows.filter((m) => !(m as MountDataItem & { subgroup?: string }).subgroup).map((mount) => (
+                    <tr key={mount.label} className="bg-gray-50 dark:bg-gray-700">
+                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: mount.color }}>
+                        {mount.label}
+                      </td>
+                      {filteredData.map((d) => {
+                        const mv = mount.data.find((v) => v.quarter === d.quarter);
+                        return (
+                          <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                            {mv ? (mv.value >= 1 ? mv.value.toFixed(2) : mv.value.toFixed(3)) : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </>
+              ) : (
+                <>
+                  {/* ── SINGLE BAR section: Wafer수요(월평균) → 기기판매량 → 대당탑재량 ── */}
+
+                  {/* Wafer 수요 (월평균) row — from lineData */}
+                  {hasLine && filteredLine && (
+                    <tr className="bg-gray-100 dark:bg-gray-600">
+                      <td className="px-2 py-1.5 border border-gray-200 font-bold whitespace-nowrap dark:border-gray-600 text-xs" style={{ color: '#111827' }}>
+                        Wafer 수요 (월평균)
+                      </td>
+                      {filteredLine.map((d) => (
+                        <td
+                          key={d.quarter}
+                          className={`px-1.5 py-1.5 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-xs font-bold ${
+                            d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'
+                          }`}
+                        >
+                          {formatLineValue(d.value)}
+                        </td>
+                      ))}
+                    </tr>
+                  )}
+                  {/* Wafer 수요 QoQ (single) */}
+                  {showQoQ && hasLine && filteredLine && (
+                    <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                      {filteredLine.map((d, i) => {
+                        const prev = i > 0 ? filteredLine[i - 1].value : 0;
+                        const qoq = i > 0 && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
+                        const sign = qoq !== null && qoq > 0 ? '+' : '';
+                        const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-blue-500' : qoq < 0 ? 'text-red-500' : 'text-gray-400';
+                        return (
+                          <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                            {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )}
+
+                  {/* 기기판매량(ea) */}
+                  <tr className="bg-white dark:bg-gray-800">
+                    <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: barColor }}>
+                      기기판매량 (ea)
+                    </td>
+                    {filteredData.map((d) => (
+                      <td
+                        key={d.quarter}
+                        className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
+                          d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        {formatTableValue(d.value)}
+                      </td>
+                    ))}
+                  </tr>
+                  {showQoQ && (
+                    <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                      {filteredData.map((d, i) => {
+                        const prev = i > 0 ? filteredData[i - 1].value : null;
+                        const qoq = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
+                        const sign = qoq !== null && qoq > 0 ? '+' : '';
+                        const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                        return (
+                          <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                            {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )}
+                  {timeRange === 12 && (() => {
+                    const vals = filteredData.map((d) => d.value);
+                    const first = vals[0];
+                    const last = vals[vals.length - 1];
+                    const years = (filteredData.length - 1) / 4;
+                    const cagr = first > 0 && last > 0 && years > 0 ? (Math.pow(last / first, 1 / years) - 1) * 100 : null;
+                    return (
+                      <tr className="bg-blue-50/50 dark:bg-blue-900/20">
+                        <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
+                        <td colSpan={filteredData.length} className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400">
+                          {cagr !== null ? `${cagr > 0 ? '+' : ''}${cagr.toFixed(1)}%` : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })()}
+
+                  {/* 대당탑재량 rows (ungrouped mountData) */}
+                  {ungroupedRows.map((mount, mIdx) => (
+                    <tr key={mount.label} className={mIdx % 2 === 0 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800'}>
+                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: mount.color }}>
+                        {mount.label}
+                      </td>
+                      {filteredData.map((d) => {
+                        const mv = mount.data.find((v) => v.quarter === d.quarter);
+                        return (
+                          <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                            {mv ? (mv.value >= 1 ? mv.value.toFixed(2) : mv.value.toFixed(3)) : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+
+                  {/* Wafer rows from mountData if any */}
+                  {waferRows.map((mount) => (
+                    <tr key={mount.label} className="bg-orange-50/40 dark:bg-orange-900/10">
+                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: lineColor }}>
+                        {mount.label}
+                      </td>
+                      {filteredData.map((d) => {
+                        const mv = mount.data.find((v) => v.quarter === d.quarter);
+                        return (
+                          <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                            {mv ? formatLineValue(mv.value) : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </>
+              )}
             </tbody>
           </table>
         </div>

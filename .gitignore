@@ -40,3 +40,9 @@ next-env.d.ts
 
 # cache
 /cache/
+
+# sqlite
+data/*.db
+
+# omc artifacts
+.omc/

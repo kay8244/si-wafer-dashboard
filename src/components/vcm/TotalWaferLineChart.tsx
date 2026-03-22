@@ -48,7 +48,7 @@ function getQuarterLabel(quarter: string): string {
 export default function TotalWaferLineChart({ data, timeRange: controlledRange, onTimeRangeChange }: Props) {
   const { isDark } = useDarkMode();
   const [internalRange, setInternalRange] = useState<TimeRange>(8);
-  const [showQoQ, setShowQoQ] = useState(true);
+  const [showQoQ, setShowQoQ] = useState(false);
   const timeRange = controlledRange ?? internalRange;
   const setTimeRange = onTimeRangeChange ?? setInternalRange;
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
@@ -202,12 +202,12 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
               axisLine={false}
               tickLine={false}
               width={45}
-              label={{ value: 'Kwsm', angle: -90, position: 'insideLeft', fontSize: 11, fill: tickFill, offset: 5 }}
+              label={{ value: 'K/M', angle: -90, position: 'insideLeft', fontSize: 11, fill: tickFill, offset: 5 }}
             />
             <Tooltip
               formatter={(value: number | undefined, name?: string) => {
                 const label = name === 'pw' ? 'PW' : name === 'epi' ? 'EPI' : 'Total';
-                return [`${(value ?? 0).toLocaleString()} Kwsm`, label];
+                return [`${(value ?? 0).toLocaleString()} K/M`, label];
               }}
               contentStyle={isDark
                 ? { fontSize: 13, borderRadius: 6, backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' }
@@ -342,7 +342,7 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
                 <td className="px-2 py-1 border border-gray-200 font-medium text-emerald-600 whitespace-nowrap dark:border-gray-600">EPI</td>
                 {filteredData.map((d) => (
                   <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>
-                    {d.epi.toLocaleString()}
+                    {d.epi.toLocaleString()}K
                   </td>
                 ))}
               </tr>
@@ -368,7 +368,7 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
                 <td className="px-2 py-1 border border-gray-200 font-medium text-blue-600 whitespace-nowrap dark:border-gray-600">PW</td>
                 {filteredData.map((d) => (
                   <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>
-                    {d.pw.toLocaleString()}
+                    {d.pw.toLocaleString()}K
                   </td>
                 ))}
               </tr>
@@ -394,7 +394,7 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
                 <td className="px-2 py-1 border border-gray-200 font-semibold text-gray-700 whitespace-nowrap dark:border-gray-600 dark:text-gray-200">Total</td>
                 {filteredData.map((d) => (
                   <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-200'}`}>
-                    {d.total.toLocaleString()}
+                    {d.total.toLocaleString()}K
                   </td>
                 ))}
               </tr>

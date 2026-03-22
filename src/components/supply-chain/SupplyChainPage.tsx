@@ -2,10 +2,12 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { InternalMetricType, SupplyChainCategoryId, ViewMode } from '@/types/indicators';
-import { SUPPLY_CHAIN_CATEGORIES, buildOverlayData } from '@/data/supply-chain-mock';
+import { useSupplyChainData } from '@/hooks/useSupplyChainData';
 import CategorySidebar from './CategorySidebar';
 import IndicatorTable from './IndicatorTable';
 import IndicatorChart from './IndicatorChart';
+import ServerLeadingIndicators from './ServerLeadingIndicators';
+import MemoryPriceIndicators from './MemoryPriceIndicators';
 
 type SegmentType = 'memory' | 'foundry';
 
@@ -18,11 +20,13 @@ const VIEW_MODES: { value: ViewMode; label: string }[] = [
 ];
 
 export default function SupplyChainPage() {
+  const { data, loading } = useSupplyChainData();
+
   const [selectedCategory, setSelectedCategory] = useState<SupplyChainCategoryId>('macro');
-  const [selectedIndicatorId, setSelectedIndicatorId] = useState<string | null>(
-    SUPPLY_CHAIN_CATEGORIES.find((c) => c.id === 'macro')?.indicators[0]?.id ?? null,
-  );
+  const [selectedIndicatorIds, setSelectedIndicatorIds] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('actual');
+  const [showServerTab, setShowServerTab] = useState(false);
+  const [showMemoryPriceTab, setShowMemoryPriceTab] = useState(false);
   const [overlayData, setOverlayData] = useState<
     { name: string; data: { month: string; value: number }[]; color: string }[]
   >([]);
@@ -30,20 +34,36 @@ export default function SupplyChainPage() {
   // Internal data overlay state (moved from InternalDataPanel)
   const [segment, setSegment] = useState<SegmentType>('memory');
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>(['SEC']);
-  const [metric, setMetric] = useState<InternalMetricType>('revenue');
+  const [metric, setMetric] = useState<InternalMetricType>('capa');
 
-  const category = SUPPLY_CHAIN_CATEGORIES.find((c) => c.id === selectedCategory)!;
-
-  // Default to showing SEC revenue overlay on mount
+  // Set initial indicator once data loads (use name as global key)
   useEffect(() => {
-    updateOverlay(['SEC'], 'revenue');
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (data && selectedIndicatorIds.length === 0) {
+      const firstName = data.categories.find((c) => c.id === 'macro')?.indicators[0]?.name;
+      if (firstName) setSelectedIndicatorIds([firstName]);
+    }
+  }, [data, selectedIndicatorIds]);
 
-  const handleCategorySelect = (id: SupplyChainCategoryId) => {
-    setSelectedCategory(id);
-    const cat = SUPPLY_CHAIN_CATEGORIES.find((c) => c.id === id);
-    setSelectedIndicatorId(cat?.indicators[0]?.id ?? null);
-  };
+  // Default to showing SEC CAPA overlay on mount (once data is available)
+  useEffect(() => {
+    if (data) {
+      updateOverlay(['SEC'], 'capa');
+    }
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const buildOverlayData = useCallback(
+    (companies: string[], m: InternalMetricType) => {
+      if (!data) return [];
+      return companies
+        .filter((c) => data.internalCompanyData[c])
+        .map((c) => ({
+          name: `${c} (${m})`,
+          data: data.internalCompanyData[c].metrics[m],
+          color: data.overlayColors[c] ?? '#64748b',
+        }));
+    },
+    [data],
+  );
 
   const updateOverlay = useCallback(
     (companies: string[], m: InternalMetricType) => {
@@ -53,8 +73,28 @@ export default function SupplyChainPage() {
       }
       setOverlayData(buildOverlayData(companies, m));
     },
-    [],
+    [buildOverlayData],
   );
+
+  const handleCategorySelect = (id: SupplyChainCategoryId) => {
+    setSelectedCategory(id);
+    setShowServerTab(false);
+    setShowMemoryPriceTab(false);
+    // Do NOT reset selected indicators — allow cross-category selection
+  };
+
+  const handleIndicatorToggle = (name: string) => {
+    setSelectedIndicatorIds((prev) => {
+      if (prev.includes(name)) {
+        return prev.filter((x) => x !== name);
+      }
+      if (prev.length < 3) {
+        return [...prev, name];
+      }
+      // Already 3 selected — drop oldest (first), add new
+      return [...prev.slice(1), name];
+    });
+  };
 
   const handleSegmentChange = (s: SegmentType) => {
     setSegment(s);
@@ -76,6 +116,16 @@ export default function SupplyChainPage() {
     updateOverlay(selectedCompanies, m);
   };
 
+  if (loading || !data) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
+      </div>
+    );
+  }
+
+  const category = data.categories.find((c) => c.id === selectedCategory) ?? data.categories[0];
+
   return (
     <div className="flex flex-col gap-5">
       {/* Top bar */}
@@ -87,8 +137,8 @@ export default function SupplyChainPage() {
           <span className="text-sm text-gray-500">
             Unit:&nbsp;
             <span className="font-medium text-gray-700">
-              {selectedIndicatorId
-                ? category.indicators.find((i) => i.id === selectedIndicatorId)?.unit ?? 'Mixed'
+              {selectedIndicatorIds.length === 1
+                ? data.categories.flatMap((c) => c.indicators).find((i) => i.name === selectedIndicatorIds[0])?.unit ?? 'Mixed'
                 : 'Mixed'}
             </span>
           </span>
@@ -118,31 +168,48 @@ export default function SupplyChainPage() {
         <CategorySidebar
           selectedCategory={selectedCategory}
           onSelect={handleCategorySelect}
+          showServerTab={showServerTab}
+          onServerTabToggle={setShowServerTab}
+          showMemoryPriceTab={showMemoryPriceTab}
+          onMemoryPriceTabToggle={setShowMemoryPriceTab}
           segment={segment}
           onSegmentChange={handleSegmentChange}
           selectedCompanies={selectedCompanies}
           onCompanyToggle={handleCompanyToggle}
           metric={metric}
           onMetricChange={handleMetricChange}
+          overlayColors={data.overlayColors}
         />
 
         {/* Right content */}
         <div className="flex min-w-0 flex-1 flex-col gap-5">
-          {/* Table */}
-          <IndicatorTable
-            category={category}
-            selectedIndicatorId={selectedIndicatorId}
-            onSelectIndicator={setSelectedIndicatorId}
-            viewMode={viewMode}
-          />
+          {/* Content: Server tab or regular indicators */}
+          {showServerTab ? (
+            <ServerLeadingIndicators indicators={data.serverIndicators} />
+          ) : showMemoryPriceTab ? (
+            <MemoryPriceIndicators indicators={data.memoryPriceIndicators} />
+          ) : (
+            <>
+              {/* Table */}
+              <IndicatorTable
+                category={category}
+                selectedIndicatorIds={selectedIndicatorIds}
+                onToggleIndicator={handleIndicatorToggle}
+                viewMode={viewMode}
+                tableMonths={data.tableMonths}
+              />
 
-          {/* Chart — full width */}
-          <IndicatorChart
-            category={category}
-            selectedIndicatorId={selectedIndicatorId}
-            viewMode={viewMode}
-            overlayData={overlayData}
-          />
+              {/* Chart — full width */}
+              <IndicatorChart
+                category={category}
+                allCategories={data.categories}
+                selectedIndicatorIds={selectedIndicatorIds}
+                onToggleIndicator={handleIndicatorToggle}
+                viewMode={viewMode}
+                overlayData={overlayData}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

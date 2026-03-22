@@ -27,8 +27,8 @@ export interface SupplyChainIndicator {
   ratingReason?: string;
 }
 
-// 내부 데이터 (고객사별 매출/투입량/가동률)
-export type InternalMetricType = 'revenue' | 'waferInput' | 'utilization';
+// 내부 데이터 (고객사별 CAPA/투입량/가동률)
+export type InternalMetricType = 'capa' | 'waferInput' | 'utilization';
 
 export interface InternalCompanyData {
   id: string;
@@ -49,6 +49,24 @@ export interface SemiAnnualEval {
   half: 'H1' | 'H2';
   rating: 'positive' | 'neutral' | 'negative';
   value: number;
+}
+
+// --- Foundry Node Utilization ---
+
+export type FoundryCompanyId = 'TSMC' | 'UMC';
+
+export interface FoundryNodeMonthly {
+  month: string;
+  waferInput: number;
+  capa: number;
+}
+
+export interface FoundryNode {
+  id: string;                        // e.g. "7n"
+  label: string;                     // e.g. "7nm"
+  company: FoundryCompanyId;
+  category: 'advanced' | 'mature';
+  monthly: FoundryNodeMonthly[];
 }
 
 // --- VCM (웨이퍼 수요 예측) ---
@@ -250,6 +268,15 @@ export interface BitGrowthQuarterlyEntry {
   isEstimate: boolean;
 }
 
+export interface IndustryMetric {
+  id: string;
+  name: string;
+  tooltip?: string;
+  unit: string;
+  period: 'monthly' | 'quarterly';
+  data: { date: string; value: number }[];
+}
+
 export interface CustomerExecutive {
   customerId: CustomerDetailId;
   label: string;
@@ -274,6 +301,9 @@ export interface CustomerExecutive {
   mktInfo?: string;
   newsQueryKo?: string;
   newsQueryEn?: string;
+  financials?: { quarter: string; revenue: number; operatingIncome: number }[];
+  transcript?: { quarter: string; summary: string; excelUrl: string; pdfUrl: string };
+  industryMetrics?: IndustryMetric[];
 }
 
 export interface EstimateTrendPoint {
@@ -281,6 +311,7 @@ export interface EstimateTrendPoint {
   waferIn: number;
   waferOut: number;
   bitGrowth: number;
+  dramRatio?: number;
 }
 
 export interface EstimateTrendData {

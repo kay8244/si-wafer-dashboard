@@ -1,0 +1,11 @@
+tab,date,customer,category,value,unit,is_estimate,version,metadata
+supply-chain,2025-01,OECD CLI,actual,,Index,0,,
+supply-chain,2025-01,OECD CLI,threeMonthMA,,Index,0,,
+supply-chain,2025-01,OECD CLI,twelveMonthMA,,Index,0,,
+supply-chain,2025-01,OECD CLI,mom,,%,0,,
+supply-chain,2025-01,OECD CLI,yoy,,%,0,,
+supply-chain,2025-02,OECD CLI,actual,,Index,0,,
+supply-chain,2025-02,OECD CLI,threeMonthMA,,Index,0,,
+supply-chain,2025-02,OECD CLI,twelveMonthMA,,Index,0,,
+supply-chain,2025-02,OECD CLI,mom,,%,0,,
+supply-chain,2025-02,OECD CLI,yoy,,%,0,,

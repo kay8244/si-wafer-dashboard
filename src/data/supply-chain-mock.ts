@@ -1,51 +1,14 @@
 import { SupplyChainCategory, InternalCompanyData, InternalMetricType } from '@/types/indicators';
+import { seededValue, getRecentMonths, generateTimeSeries } from '@/lib/data-generation';
 
 // ── Dynamic month generation based on today's date ──────────────────────────
 const FULL_MONTH_COUNT = 36;
-const TABLE_MONTH_COUNT = 6;
-
-function getRecentMonths(count: number): string[] {
-  const now = new Date();
-  const months: string[] = [];
-  for (let i = count - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    months.push(`${yyyy}-${mm}`);
-  }
-  return months;
-}
+const TABLE_MONTH_COUNT = 12;
 
 /** Full 36-month range for charts */
 export const DYNAMIC_MONTHS = getRecentMonths(FULL_MONTH_COUNT);
 /** Last 6 months for the indicator table display */
 export const TABLE_MONTHS = DYNAMIC_MONTHS.slice(-TABLE_MONTH_COUNT);
-
-// Deterministic seed-based pseudo-random to avoid SSR hydration mismatch
-function seededValue(seed: number): number {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-}
-
-/**
- * Generate a 36-point time series between startVal and endVal with
- * deterministic noise controlled by volatilityPct and seed.
- */
-function generateTimeSeries(
-  startVal: number,
-  endVal: number,
-  volatilityPct: number,
-  seed: number,
-): number[] {
-  const values: number[] = [];
-  for (let i = 0; i < FULL_MONTH_COUNT; i++) {
-    const progress = i / (FULL_MONTH_COUNT - 1);
-    const trend = startVal + (endVal - startVal) * progress;
-    const noise = (seededValue(seed + i * 7) - 0.5) * 2 * volatilityPct * Math.abs(trend);
-    values.push(trend + noise);
-  }
-  return values;
-}
 
 /**
  * Build MonthlyData[] from raw values with proper 3MMA, 12MMA, MoM%, YoY%.
@@ -91,7 +54,7 @@ function genMonthly(baseValues: number[]) {
 
 // ── Helper: shorthand for generating monthly data from start/end/vol/seed ──
 function gen(start: number, end: number, vol: number, seed: number) {
-  return genMonthly(generateTimeSeries(start, end, vol, seed));
+  return genMonthly(generateTimeSeries(FULL_MONTH_COUNT, start, end, vol, seed));
 }
 
 // ── Supply Chain Categories (matching reference image) ──────────────────────
@@ -377,7 +340,7 @@ export const SUPPLY_CHAIN_CATEGORIES: SupplyChainCategory[] = [
 // ── Internal company mock data (36 months) ──────────────────────────────────
 
 function genMetric36(startVal: number, endVal: number, seed: number): { month: string; value: number }[] {
-  const values = generateTimeSeries(startVal, endVal, 0.03, seed);
+  const values = generateTimeSeries(FULL_MONTH_COUNT, startVal, endVal, 0.03, seed);
   return DYNAMIC_MONTHS.map((month, i) => ({ month, value: +values[i].toFixed(0) }));
 }
 
@@ -387,8 +350,8 @@ export const INTERNAL_COMPANY_DATA: Record<string, InternalCompanyData> = {
     id: 'SEC',
     name: 'SEC',
     metrics: {
-      revenue: genMetric36(8200, 12000, 601),
-      waferInput: genMetric36(480, 590, 602),
+      capa: genMetric36(8200, 12000, 601),
+      waferInput: genMetric36(6400, 10920, 602),
       utilization: genMetric36(78, 91, 603),
     },
   },
@@ -396,8 +359,8 @@ export const INTERNAL_COMPANY_DATA: Record<string, InternalCompanyData> = {
     id: 'SK Hynix',
     name: 'SK Hynix',
     metrics: {
-      revenue: genMetric36(4200, 6500, 611),
-      waferInput: genMetric36(260, 330, 612),
+      capa: genMetric36(4200, 6500, 611),
+      waferInput: genMetric36(3190, 5850, 612),
       utilization: genMetric36(76, 90, 613),
     },
   },
@@ -405,8 +368,8 @@ export const INTERNAL_COMPANY_DATA: Record<string, InternalCompanyData> = {
     id: 'Micron',
     name: 'Micron',
     metrics: {
-      revenue: genMetric36(3200, 5000, 621),
-      waferInput: genMetric36(185, 245, 622),
+      capa: genMetric36(3200, 5000, 621),
+      waferInput: genMetric36(2370, 4400, 622),
       utilization: genMetric36(74, 88, 623),
     },
   },
@@ -415,8 +378,8 @@ export const INTERNAL_COMPANY_DATA: Record<string, InternalCompanyData> = {
     id: 'TSMC',
     name: 'TSMC',
     metrics: {
-      revenue: genMetric36(15500, 23000, 631),
-      waferInput: genMetric36(980, 1250, 632),
+      capa: genMetric36(15500, 23000, 631),
+      waferInput: genMetric36(13020, 21850, 632),
       utilization: genMetric36(84, 95, 633),
     },
   },
@@ -424,8 +387,8 @@ export const INTERNAL_COMPANY_DATA: Record<string, InternalCompanyData> = {
     id: 'SMIC',
     name: 'SMIC',
     metrics: {
-      revenue: genMetric36(1500, 2200, 641),
-      waferInput: genMetric36(120, 155, 642),
+      capa: genMetric36(1500, 2200, 641),
+      waferInput: genMetric36(1050, 1804, 642),
       utilization: genMetric36(70, 82, 643),
     },
   },
@@ -433,11 +396,66 @@ export const INTERNAL_COMPANY_DATA: Record<string, InternalCompanyData> = {
     id: 'GFs',
     name: 'GFs',
     metrics: {
-      revenue: genMetric36(1050, 1400, 651),
-      waferInput: genMetric36(82, 108, 652),
+      capa: genMetric36(1050, 1400, 651),
+      waferInput: genMetric36(714, 1120, 652),
       utilization: genMetric36(68, 80, 653),
     },
   },
+};
+
+// ── Foundry node-level mock data (36 months) ────────────────────────────────
+
+import type { FoundryNode, FoundryCompanyId } from '@/types/indicators';
+
+function genNodeMetric36(
+  startCapa: number,
+  endCapa: number,
+  startUtil: number,
+  endUtil: number,
+  seed: number,
+): { month: string; waferInput: number; capa: number }[] {
+  const capaValues = generateTimeSeries(FULL_MONTH_COUNT, startCapa, endCapa, 0.02, seed);
+  const utilValues = generateTimeSeries(FULL_MONTH_COUNT, startUtil, endUtil, 0.03, seed + 100);
+  return DYNAMIC_MONTHS.map((month, i) => {
+    const capa = +capaValues[i].toFixed(0);
+    const util = Math.max(0, Math.min(100, utilValues[i]));
+    const waferInput = +(capa * util / 100).toFixed(0);
+    return { month, waferInput, capa };
+  });
+}
+
+const TSMC_NODES: FoundryNode[] = [
+  { id: '90n', label: '90nm', company: 'TSMC', category: 'mature', monthly: genNodeMetric36(55, 48, 62, 58, 701) },
+  { id: '45n', label: '45nm', company: 'TSMC', category: 'mature', monthly: genNodeMetric36(82, 75, 68, 64, 702) },
+  { id: '28n', label: '28nm', company: 'TSMC', category: 'mature', monthly: genNodeMetric36(125, 130, 78, 82, 703) },
+  { id: '12n', label: '12nm', company: 'TSMC', category: 'mature', monthly: genNodeMetric36(105, 110, 75, 80, 704) },
+  { id: '7n', label: '7nm', company: 'TSMC', category: 'advanced', monthly: genNodeMetric36(155, 170, 88, 95, 705) },
+  { id: '5n', label: '5nm', company: 'TSMC', category: 'advanced', monthly: genNodeMetric36(195, 230, 85, 96, 706) },
+  { id: '3n', label: '3nm', company: 'TSMC', category: 'advanced', monthly: genNodeMetric36(80, 150, 60, 90, 707) },
+  { id: '2n', label: '2nm', company: 'TSMC', category: 'advanced', monthly: genNodeMetric36(20, 65, 30, 70, 708) },
+];
+
+const UMC_NODES: FoundryNode[] = [
+  { id: '90n', label: '90nm', company: 'UMC', category: 'mature', monthly: genNodeMetric36(32, 28, 60, 55, 711) },
+  { id: '45n', label: '45nm', company: 'UMC', category: 'mature', monthly: genNodeMetric36(52, 48, 65, 62, 712) },
+  { id: '28n', label: '28nm', company: 'UMC', category: 'mature', monthly: genNodeMetric36(85, 82, 72, 75, 713) },
+  { id: '12n', label: '12nm', company: 'UMC', category: 'mature', monthly: genNodeMetric36(42, 40, 68, 70, 714) },
+];
+
+export const FOUNDRY_NODES: Record<FoundryCompanyId, FoundryNode[]> = {
+  TSMC: TSMC_NODES,
+  UMC: UMC_NODES,
+};
+
+export const FOUNDRY_NODE_COLORS: Record<string, string> = {
+  '90n': '#94a3b8',
+  '45n': '#64748b',
+  '28n': '#f97316',
+  '12n': '#eab308',
+  '7n': '#22c55e',
+  '5n': '#3b82f6',
+  '3n': '#8b5cf6',
+  '2n': '#ec4899',
 };
 
 export const OVERLAY_COLORS: Record<string, string> = {

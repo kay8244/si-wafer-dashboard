@@ -19,9 +19,9 @@ const DEFAULT_KPIS: KpiId[] = ['inventoryMonths', 'utilization', 'capa'];
 const KPI_META: Record<KpiId, { label: string; unit: string; decimals: number }> = {
   inventoryMonths: { label: '재고수준', unit: '개월', decimals: 1 },
   utilization: { label: '가동률', unit: '%', decimals: 1 },
-  capa: { label: 'Capa', unit: 'Km\u00B2', decimals: 1 },
-  waferInput: { label: '투입량', unit: 'Km\u00B2', decimals: 1 },
-  purchaseVolume: { label: '구매량', unit: 'Km\u00B2', decimals: 1 },
+  capa: { label: 'Capa', unit: 'K/M', decimals: 1 },
+  waferInput: { label: '투입량', unit: 'K/M', decimals: 1 },
+  purchaseVolume: { label: '구매량', unit: 'K/M', decimals: 1 },
 };
 
 const ALL_KPI_IDS: KpiId[] = ['inventoryMonths', 'utilization', 'capa', 'waferInput', 'purchaseVolume'];
@@ -91,7 +91,7 @@ export default function ExecutivePanel({ data }: Props) {
   };
 
   const trendIcon = (trend: 'up' | 'down' | 'flat') => {
-    if (trend === 'up') return <span className="text-green-500">&#9650;</span>;
+    if (trend === 'up') return <span className="text-blue-500">&#9650;</span>;
     if (trend === 'down') return <span className="text-red-500">&#9660;</span>;
     return <span className="text-gray-400">&#9654;</span>;
   };
@@ -190,7 +190,7 @@ export default function ExecutivePanel({ data }: Props) {
               <span
                 className={
                   kpi.trend === 'up'
-                    ? 'font-semibold text-green-600 dark:text-green-400'
+                    ? 'font-semibold text-blue-600 dark:text-blue-400'
                     : kpi.trend === 'down'
                       ? 'font-semibold text-red-600 dark:text-red-400'
                       : 'text-gray-500 dark:text-gray-400'

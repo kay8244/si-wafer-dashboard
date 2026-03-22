@@ -11,37 +11,361 @@
 | Recharts | 3.7 |
 | Tailwind CSS | 4.1 |
 | TypeScript | 5.9 |
+| SQLite (better-sqlite3) | 로컬/사내용 |
+| PostgreSQL (Neon) | Vercel 배포용 |
 
 ## 환경 변수 (.env.local)
 
 ```
 ANTHROPIC_API_KEY=      # Anthropic API 키 (뉴스 AI 요약용)
-DART_API_KEY=           # DART 공시 API 키 (분석 페이지용, 없으면 데모 폴백)
+TAVILY_API_KEY=         # Tavily API 키 (뉴스 검색용, 선택)
+
+# Postgres 사용 시 (선택 — 없으면 SQLite 자동 사용)
+POSTGRES_URL=           # Neon/Vercel Postgres 연결 URL
+DATABASE_URL=           # 또는 이것
 ```
 
 ## 실행
 
 ```bash
 npm install
-npm run dev          # http://localhost:3000
-npm run build        # 프로덕션 빌드 (에러 검증용)
+npm run seed             # SQLite DB 생성 (data/dashboard.db, 18,092 rows)
+npm run dev              # http://localhost:3000
+npm run build            # 프로덕션 빌드 (에러 검증용)
 ```
+
+> **DB 선택**: `.env.local`에 `POSTGRES_URL` 또는 `DATABASE_URL`이 있으면 Postgres, 없으면 SQLite를 사용합니다.
 
 ---
 
 ## 라우트 구조
 
 ```
-/                              ← [현황판] 이 문서의 주요 설명 대상
-├── 탭1: 전방시장               → SupplyChainPage
-├── 탭2: VCM (수요예측)         → VcmPage
-├── 탭3: 고객별                 → CustomerDetailPage
-└── [링크] "경쟁사/고객실적" → /analysis
+/                              <- 현황판 (메인)
++-- 탭1: 전방시장               -> SupplyChainPage
+|   +-- 기존 지표 (Macro/Application/Semiconductor/Equipment/Wafer)
+|   +-- Application > Server 선행지표 (서브탭)
+|   +-- Semiconductor > Memory Price (서브탭)
++-- 탭2: VCM (수요예측)         -> VcmPage
++-- 탭3: 고객별                 -> CustomerDetailPage
+    +-- 메모리 (SEC, SKHY, Micron, Koxia)
+    +-- 파운드리 (SEC, TSMC, SMIC, GFs, STM, Intel)
+        +-- Foundry 노드별 가동률 차트
 
-/analysis                      ← [분석 페이지] 수정 불필요 영역
-├── 탭1: 경쟁사 분석            → DashboardContainer
-└── 탭2: 고객 분석              → CustomerAnalysisContainer (DRAM/NAND/Foundry)
+API 라우트:
++-- GET /api/supply-chain      <- 전방시장 + Foundry 노드 + Server 선행지표 + Memory Price
++-- GET /api/vcm               <- VCM 수요예측 데이터
++-- GET /api/customer-detail   <- 고객별 상세 데이터
++-- GET /api/news              <- AI 뉴스 요약
++-- POST /api/transcript       <- Earnings Transcript AI 요약
 ```
+
+---
+
+## 현황판 데이터 흐름
+
+```
++-----------------+     +----------------------+     +-------------------------+
+|  DB             |     |  API Routes          |     |  React Hooks + 컴포넌트 |
+|  (SQLite 또는   |---->|  /api/supply-chain   |---->|  useSupplyChainData()   |
+|   Postgres)     |     |  /api/vcm            |---->|  useVcmData()           |
+|                 |     |  /api/customer-detail |---->|  useCustomerDetailData()|
+|  metrics 테이블 |     |  /api/news           |---->|  useNews()              |
+|  (Long-form)    |     |  /api/transcript     |---->|  TranscriptSummary      |
++-----------------+     +----------------------+     +-------------------------+
+```
+
+**모든 데이터가 DB -> API -> Hook -> 컴포넌트** 순으로 전달됩니다.
+`src/data/*-mock.ts` 파일들은 **seed 스크립트에서만** 사용되며, 컴포넌트가 직접 import하지 않습니다.
+
+---
+
+## DB 구조
+
+모든 데이터는 단일 `metrics` 테이블에 **Long-form**으로 저장됩니다.
+
+| 컬럼 | 타입 | 설명 | 예시 |
+|------|------|------|------|
+| `tab` | TEXT | 대시보드 탭 구분 | `supply-chain`, `vcm`, `customer-detail` |
+| `date` | TEXT | 기간 | `2025-01`, `Q2'24`, `_meta` |
+| `customer` | TEXT | 엔티티명 | `OECD CLI`, `SEC`, `TSMC_7n` |
+| `category` | TEXT | 메트릭 분류 | `actual`, `foundry_node`, `server_indicator` |
+| `value` | REAL | 숫자 값 | `100.47` |
+| `unit` | TEXT | 단위 | `Index`, `K/M`, `%`, `$` |
+| `is_estimate` | INTEGER | 추정치 여부 (0/1) | `0` = 확정, `1` = 추정 |
+| `version` | TEXT | 데이터 버전/표시명 | `current`, `previous`, `SEC`, `8GB DDR4 DIMM (PC)` |
+| `metadata` | TEXT | 추가 정보 (JSON) | `{"categoryId":"macro"}` |
+
+---
+
+## 실데이터 적재 가이드
+
+### 1. 전방시장 외부 지표 (`tab = 'supply-chain'`)
+
+5개 카테고리: Macro(M), Application(A), Semiconductor(S), Equipment(E), Wafer(W)
+
+#### 1-1. 지표 메타데이터
+
+```sql
+-- 각 지표의 메타 정보 (카테고리, 이름, 단위, 판정, 선행성 등)
+INSERT INTO metrics (tab, date, customer, category, value, unit, is_estimate, version, metadata)
+VALUES (
+  'supply-chain',
+  '_meta',                    -- 메타 행은 date='_meta'
+  'OECD CLI',                 -- customer = 지표명 (고유 ID 역할)
+  'indicatorMeta',            -- category 고정
+  NULL,
+  'Index',                    -- unit
+  0,
+  NULL,
+  '{"categoryId":"macro","indicatorId":"A","name":"OECD CLI","unit":"Index","judgment":"경기선행지수 100 회복","leadingRating":"상","ratingReason":"반도체 수요와 6~9개월 선행"}'
+);
+```
+
+**metadata JSON 필드:**
+
+| 필드 | 설명 | 예시 |
+|------|------|------|
+| `categoryId` | 카테고리 | `macro`, `application`, `semiconductor`, `equipment`, `wafer` |
+| `indicatorId` | 카테고리 내 순서 | `A`, `B`, `C` |
+| `name` | 지표 표시명 | `OECD CLI` |
+| `unit` | 단위 | `Index`, `$B`, `M units`, `%` |
+| `judgment` | 반기 판정 코멘트 | `OECD 경기선행지수 100 회복...` |
+| `leadingRating` | 선행성 등급 | `상`, `중상`, `중`, `중하`, `하` |
+| `ratingReason` | 선행성 이유 | `경기선행지수는 반도체 수요와...` |
+
+#### 1-2. 월별 시계열 데이터
+
+각 지표에 대해 5가지 뷰 모드(actual, threeMonthMA, twelveMonthMA, mom, yoy)별로 행을 추가합니다.
+
+```sql
+-- Actual 값
+INSERT INTO metrics (tab, date, customer, category, value, unit)
+VALUES ('supply-chain', '2025-03', 'OECD CLI', 'actual', 100.47, 'Index');
+
+-- 3개월 이동평균
+INSERT INTO metrics (tab, date, customer, category, value, unit)
+VALUES ('supply-chain', '2025-03', 'OECD CLI', 'threeMonthMA', 100.35, 'Index');
+
+-- 12개월 이동평균
+INSERT INTO metrics (tab, date, customer, category, value, unit)
+VALUES ('supply-chain', '2025-03', 'OECD CLI', 'twelveMonthMA', 100.22, 'Index');
+
+-- MoM (전월비 %)
+INSERT INTO metrics (tab, date, customer, category, value, unit)
+VALUES ('supply-chain', '2025-03', 'OECD CLI', 'mom', 0.3, '%');
+
+-- YoY (전년비 %)
+INSERT INTO metrics (tab, date, customer, category, value, unit)
+VALUES ('supply-chain', '2025-03', 'OECD CLI', 'yoy', 1.2, '%');
+```
+
+> 36개월 x 5뷰 x 지표 수 = 총 행 수. 예: 18개 지표 x 36개월 x 5뷰 = 3,240행
+
+#### 1-3. 내부 데이터 오버레이 (CAPA/투입량/가동률)
+
+메모리/파운드리 업체별 내부 데이터:
+
+```sql
+-- SEC CAPA (K/M)
+INSERT INTO metrics (tab, date, customer, category, value, unit, version)
+VALUES ('supply-chain', '2025-03', 'SEC', 'internal_capa', 11855, 'K/M', 'SEC');
+
+-- SEC 투입량 (K/M) — CAPA와 비슷한 수준 (가동률 = 투입량/CAPA)
+INSERT INTO metrics (tab, date, customer, category, value, unit, version)
+VALUES ('supply-chain', '2025-03', 'SEC', 'internal_waferInput', 10630, 'K/M', 'SEC');
+
+-- SEC 가동률 (%)
+INSERT INTO metrics (tab, date, customer, category, value, unit, version)
+VALUES ('supply-chain', '2025-03', 'SEC', 'internal_utilization', 89, '%', 'SEC');
+```
+
+**회사 목록**: SEC, SK Hynix, Micron (메모리) / SEC, TSMC, SMIC, GFs (파운드리)
+
+**오버레이 색상**:
+```sql
+INSERT INTO metrics (tab, date, customer, category, value, unit, version)
+VALUES ('supply-chain', '_meta', 'SEC', 'overlayColor', NULL, NULL, '#f59e0b');
+```
+
+### 2. Foundry 노드별 가동률 (`tab = 'supply-chain'`, `category = 'foundry_node'`)
+
+TSMC/UMC 노드별 투입량과 CAPA. 가동률은 프론트엔드에서 계산 (투입량/CAPA*100).
+
+```sql
+-- TSMC 7nm 노드 데이터
+INSERT INTO metrics (tab, date, customer, category, value, unit, version, metadata)
+VALUES (
+  'supply-chain',
+  '2025-03',
+  'TSMC_7n',                  -- customer = '{회사}_{노드ID}'
+  'foundry_node',
+  14500,                      -- value = 투입량 (waferInput)
+  'K/M',
+  'TSMC',                     -- version = 회사명
+  '{"capa":15200,"nodeId":"7n","nodeLabel":"7nm","category":"advanced"}'
+);
+```
+
+**TSMC 노드**: 90n, 45n, 28n, 12n (비선단/mature) | 7n, 5n, 3n, 2n (선단/advanced)
+**UMC 노드**: 90n, 45n, 28n, 12n (비선단/mature)
+
+**노드 색상**:
+```sql
+INSERT INTO metrics (tab, date, customer, category, value, unit, version)
+VALUES ('supply-chain', '_meta', '7n', 'foundry_node_color', NULL, NULL, '#22c55e');
+```
+
+### 3. Server 선행지표 (`tab = 'supply-chain'`, `category = 'server_indicator'`)
+
+12MMA YoY (%) 값. 계층 구조는 metadata JSON으로 표현.
+
+```sql
+INSERT INTO metrics (tab, date, customer, category, value, unit, version, metadata)
+VALUES (
+  'supply-chain',
+  '2025-03',
+  'wistron',                  -- customer = 지표 ID
+  'server_indicator',
+  -4.2,                       -- value = 12MMA YoY (%)
+  '%',
+  'Wistron',                  -- version = 표시명
+  '{"group":"서버 공급자","subGroup":"서버\nODM","company":"Wistron"}'
+);
+```
+
+**지표 목록:**
+
+| ID | group | subGroup | company |
+|----|-------|----------|---------|
+| `srv_sales` | 서버판매량 | (없음) | (없음) |
+| `dc_construction` | 서버 구매자 투자 | 미 Data Center | DC 건설지출 |
+| `dc_power` | 서버 구매자 투자 | 미 Data Center | DC 집중지역 전력 소비량 |
+| `wistron` | 서버 공급자 | 서버 ODM | Wistron |
+| `wlwynn` | 서버 공급자 | 서버 ODM | Wlwynn |
+| `quanta` | 서버 공급자 | 서버 ODM | Quanta |
+| `inventec` | 서버 공급자 | 서버 ODM | Inventec |
+| `kinsus` | 핵심 부품 공급자 | ABF | Kinsus |
+| `unimicron` | 핵심 부품 공급자 | ABF | Unimicron |
+| `isupt` | 핵심 부품 공급자 | MLB | 이수페타시스 |
+| `doosan` | 핵심 부품 공급자 | CCL | 두산 |
+| `tw3` | 핵심 부품 공급자 | CCL | 대만 3사 |
+| `aspeed` | 핵심 부품 공급자 | BMC | Aspeed |
+| `avc` | 핵심 부품 공급자 | Cooling | AVC |
+
+### 4. Memory Price (`tab = 'supply-chain'`, `category = 'memory_price'`)
+
+메모리 가격 데이터 (USD).
+
+```sql
+INSERT INTO metrics (tab, date, customer, category, value, unit, version)
+VALUES (
+  'supply-chain',
+  '2025-03',
+  'ddr4_8g_pc',               -- customer = 지표 ID
+  'memory_price',
+  1.65,                       -- value = 가격 (USD)
+  '$',
+  '8GB DDR4 DIMM (PC)'        -- version = 표시명
+);
+```
+
+**지표 목록:**
+
+| ID | 표시명 |
+|----|--------|
+| `ddr4_8g_pc` | 8GB DDR4 DIMM (PC) |
+| `ddr4_16g_pc` | 16GB DDR4 DIMM (PC) |
+| `ddr4_32g_srv` | 32GB DDR4 RDIMM (SERVER) |
+| `lpddr4_8g` | 8GB LPDDR4 (SMP) |
+| `lpddr4_12g` | 12GB LPDDR4 (SMP) |
+| `ddr5_16g` | 16GB DDR5 DIMM |
+| `ddr5_64g` | 64GB DDR5 RDIMM |
+| `ddr5_96g_srv` | 96GB DDR5 RDIMM (SERVER) |
+| `ddr5_128g_srv` | 128GB DDR5 RDIMM (SERVER) |
+| `ddr5_256g_srv` | 256GB DDR5 RDIMM (SERVER) |
+| `lpddr5_8g` | 8GB LPDDR5 (SMP) |
+| `lpddr5_12g` | 12GB LPDDR5 (SMP) |
+| `nand_256g_tlc` | NAND Price 256Gb TLC Wafer |
+| `nand_512g_tlc` | NAND Price 512Gb TLC Wafer |
+| `nand_1t_qlc` | NAND Price 1Tb QLC Wafer |
+
+### 5. 고객별 데이터 (`tab = 'customer-detail'`)
+
+상세 적재 방법은 **[DATA_GUIDE.md](./DATA_GUIDE.md)**를 참고하세요.
+
+**주요 category 값:**
+
+| category | 설명 | value 단위 |
+|----------|------|-----------|
+| `monthly_waferInput` | 월별 투입량 | Km2 |
+| `monthly_purchaseVolume` | 월별 구매량 | Km2 |
+| `monthly_capa` | 월별 생산능력 | Km2 |
+| `monthly_utilization` | 월별 가동률 | % |
+| `monthly_inventoryMonths` | 월별 재고월수 | 개월 |
+| `financial_revenue` | 분기별 매출 | $B |
+| `financial_operatingIncome` | 분기별 영업이익 | $B |
+| `transcript` | Earnings Transcript AI 요약 | - |
+| `industry_metric` | 산업 지표 (가동률, 매출 등) | 혼합 |
+
+### 6. VCM 데이터 (`tab = 'vcm'`)
+
+상세 적재 방법은 **[DATA_GUIDE.md](./DATA_GUIDE.md)**를 참고하세요.
+
+---
+
+## 데이터 적재 방법
+
+### 목업 데이터로 초기화
+
+```bash
+# SQLite (로컬)
+npm run seed                   # src/data/*-mock.ts -> data/dashboard.db (18,092 rows)
+
+# Postgres (배포용)
+npx tsx scripts/seed-postgres.ts  # 동일 데이터 -> Postgres (18,092 rows)
+```
+
+### 실데이터 적재
+
+```bash
+# 방법 1: SQL 직접 입력
+sqlite3 data/dashboard.db "INSERT INTO metrics (...) VALUES (...)"
+
+# 방법 2: CSV import
+sqlite3 data/dashboard.db ".mode csv" ".import data/real-data.csv metrics"
+
+# 방법 3: seed 스크립트 수정 (scripts/seed.ts 또는 scripts/seed-postgres.ts)
+# src/data/*-mock.ts의 데이터를 실제 값으로 교체 후:
+npm run seed                   # SQLite
+npx tsx scripts/seed-postgres.ts  # Postgres
+```
+
+### 데이터 확인
+
+```bash
+# 탭별 row 수
+sqlite3 data/dashboard.db "SELECT tab, category, count(*) FROM metrics GROUP BY tab, category ORDER BY tab"
+
+# 특정 고객 데이터
+sqlite3 data/dashboard.db "SELECT date, value FROM metrics WHERE customer='SEC' AND category='internal_waferInput' ORDER BY date DESC LIMIT 5"
+
+# Foundry 노드 데이터
+sqlite3 data/dashboard.db "SELECT customer, date, value, metadata FROM metrics WHERE category='foundry_node' AND customer LIKE 'TSMC%' ORDER BY date DESC LIMIT 5"
+
+# Server 선행지표
+sqlite3 data/dashboard.db "SELECT customer, date, value FROM metrics WHERE category='server_indicator' ORDER BY date DESC LIMIT 5"
+
+# Memory Price
+sqlite3 data/dashboard.db "SELECT customer, date, value FROM metrics WHERE category='memory_price' ORDER BY date DESC LIMIT 5"
+```
+
+### 주의사항
+
+- **seed 실행 시 기존 데이터 전체 삭제** (`DELETE FROM metrics`) 후 재삽입
+- **투입량(waferInput)은 CAPA와 비슷한 수준**이어야 함 (가동률 = 투입량/CAPA)
+- **Postgres 사용 시**: `.env.local`에 `POSTGRES_URL` 설정 + `npx tsx scripts/seed-postgres.ts` 실행
+- **SQLite와 Postgres 동시 유지**: 두 seed 스크립트 모두 실행해야 데이터 동기화
 
 ---
 
@@ -49,337 +373,128 @@ npm run build        # 프로덕션 빌드 (에러 검증용)
 
 ### 탭1: 전방시장 (`components/supply-chain/`)
 
-매크로/반도체/장비/어플리케이션 카테고리별 시장 지표를 테이블+차트로 표시합니다.
+매크로/반도체/장비/어플리케이션/웨이퍼 카테고리별 시장 지표를 테이블+차트로 표시합니다.
 
 | 컴포넌트 | 역할 |
 |---------|------|
 | `SupplyChainPage.tsx` | 메인 페이지 (사이드바 + 테이블 + 차트 조합) |
-| `CategorySidebar.tsx` | 좌측 카테고리 선택 (매크로/반도체/장비/앱) |
-| `IndicatorTable.tsx` | 지표 테이블 (Actual, 3MMA, 12MMA, MoM, YoY 뷰 전환) |
-| `IndicatorChart.tsx` | 지표 라인차트 (Recharts) |
+| `CategorySidebar.tsx` | 좌측 카테고리 선택 + 서브탭 (Server 선행지표, Memory Price) |
+| `IndicatorTable.tsx` | 지표 테이블 (Actual, 3MMA, 12MMA, MoM, YoY 뷰 전환) — 12개월 표시 |
+| `IndicatorChart.tsx` | 지표 라인차트 (최대 3개 선택, 클릭 해제 지원) |
+| `ServerLeadingIndicators.tsx` | Server 선행지표 계층 테이블 + 차트 (12MMA YoY %) |
+| `MemoryPriceIndicators.tsx` | Memory Price 테이블 + 차트 (USD) |
+| `FoundryUtilizationChart.tsx` | Foundry 노드별 가동률 차트 (고객별 탭에서 사용) |
 
-**데이터 소스**: `src/data/supply-chain-mock.ts` (하드코딩)
+**주요 동작:**
+- 복수 지표 선택 가능 (최대 3개), 차트 범례에서 클릭으로 해제
+- 오버레이: CAPA/투입량/가동률 내부 데이터 오버레이 (단위: K/M, %)
+- 테이블 헤더: 년도/월 2행 분리, 년도 경계 세로선
+- Application > Server 선행지표: 서버 밸류체인 계층 테이블
+- Semiconductor > Memory Price: DRAM/NAND 가격 추이 테이블
 
 ### 탭2: VCM — 수요예측 (`components/vcm/`)
 
-Application별·Device별 웨이퍼 수요를 예측 차트/테이블로 표시합니다.
+Application별/Device별 웨이퍼 수요를 예측 차트/테이블로 표시합니다.
 
 | 컴포넌트 | 역할 |
 |---------|------|
 | `VcmPage.tsx` | 메인 페이지 (필터, InlineNews, WaferDemandAnalysis 인라인 포함) |
-| `TotalWaferLineChart.tsx` | 총 웨이퍼 수요 라인차트 (PW/EPI 구분, QoQ 기본 ON) |
-| `DemandBarChart.tsx` | Application 수요 막대차트 + 탑재량 테이블 (QoQ 기본 ON) |
-| `DeviceStackedChart.tsx` | Device별 Stacked 영역차트 (QoQ 기본 ON) |
-
-> **뉴스 토글**: 상단 "뉴스" 버튼으로 AI 뉴스 요약 패널 ON/OFF (기본: OFF)
-
-**데이터 소스**: `src/data/vcm-mock.ts` (하드코딩)
+| `TotalWaferLineChart.tsx` | 총 웨이퍼 수요 라인차트 (PW/EPI 구분) |
+| `DemandBarChart.tsx` | Application별 Wafer 수요 꺾은선 + 기기판매량 막대 |
+| `DeviceStackedChart.tsx` | Device별 Stacked 영역차트 |
 
 ### 탭3: 고객별 (`components/customer-detail/`)
 
-Memory(DRAM/NAND) 및 Foundry 고객사별 KPI, 월별 지표, 외부 추정치 비교 등을 표시합니다.
+Memory/Foundry 고객사별 KPI, 월별 지표, 재무실적, 산업 지표 등을 표시합니다.
 
 | 컴포넌트 | 역할 |
 |---------|------|
-| `CustomerDetailPage.tsx` | 메인 (상단 탭으로 고객사 전환, Memory/Foundry 그룹) |
-| `ExecutivePanel.tsx` | 경영진 요약 (KPI 카드, Product Mix, Scrap Rate) |
+| `CustomerDetailPage.tsx` | 메인 (상단 탭으로 고객사 전환) |
+| `ExecutivePanel.tsx` | 경영진 요약 (KPI 카드, Product Mix) |
 | `MonthlyMetricsChart.tsx` | 월별 지표 차트 (투입량/구매량/재고/가동률) |
-| `ExternalComparison.tsx` | 외부 추정치 비교 테이블 |
-| `WeeklySummary.tsx` | 주간 요약 코멘트 |
-| `EstimateTrendChart.tsx` | Estimate 트렌드 차트 (UBS/TrendForce 비교) |
-| `CustomerNewsPanel.tsx` | 고객사 AI 뉴스 요약 |
+| `ExternalComparison.tsx` | 외부 추정치 비교 + Foundry 가동률 차트 |
+| `FinancialResultsTable.tsx` | 재무실적 테이블 |
+| `TranscriptSummary.tsx` | Earnings Transcript AI 요약 |
+| `IndustryMetricsPanel.tsx` | 산업 지표 |
 
-> **뉴스 토글**: 상단 "뉴스" 버튼으로 뉴스 패널 ON/OFF (기본: OFF)
-
-**데이터 소스**: `src/data/customer-detail-mock.ts` (하드코딩)
-
----
-
-## 데이터 적재 방법 (핵심)
-
-현황판의 3개 탭은 모두 **`src/data/` 폴더의 TypeScript Mock 파일**에서 데이터를 읽습니다.
-API 연동이 아닌 하드코딩 방식이므로, 데이터 갱신 시 해당 파일을 직접 수정해야 합니다.
-
-### Mock 데이터 파일 구조
-
-```
-src/data/
-├── supply-chain-mock.ts    ← 탭1: 전방시장
-├── vcm-mock.ts             ← 탭2: VCM 수요예측
-└── customer-detail-mock.ts ← 탭3: 고객별 상세
-```
-
-### 1) `supply-chain-mock.ts` — 전방시장 지표
-
-```ts
-// 카테고리 구조: wafer | macro | application | semiconductor | equipment
-export const SUPPLY_CHAIN_CATEGORIES: SupplyChainCategory[] = [
-  {
-    id: 'macro',
-    label: '매크로',
-    indicators: [
-      {
-        id: 'gdp',
-        name: 'GDP 성장률',
-        unit: '%',
-        monthly: [
-          { month: '2024-01', actual: 3.2, threeMonthMA: 3.1, twelveMonthMA: 3.0, mom: 0.1, yoy: 0.5 },
-          // ... 월별 데이터 추가
-        ],
-        judgment: '긍정적',           // 반기 판단
-        leadingRating: '상',          // 선행지표 등급 (상/중상/중/중하/하)
-        ratingReason: '...',          // 등급 사유
-      },
-      // ... 지표 추가
-    ],
-  },
-  // ... 카테고리 추가
-];
-```
-
-**데이터 갱신 방법**: `indicators[].monthly[]` 배열에 새 월 데이터를 추가합니다.
-
-### 2) `vcm-mock.ts` — VCM 수요예측
-
-```ts
-export const VCM_DATA: VcmData = {
-  versions: [{ id: 'v1', label: '2026.02', date: '2026-02-01' }],
-
-  // Application별 수요 (서버, 스마트폰, PC, 차량, IoT 등)
-  applicationDemands: {
-    traditionalServer: {
-      label: '전통 서버',
-      yearly: [{ year: 2024, value: 1200, isEstimate: false }, ...]
-    },
-    // ...
-  },
-
-  // Device별 웨이퍼 수요 (DRAM, HBM, NAND, Foundry 등)
-  deviceWaferDemands: { ... },
-
-  // 총 웨이퍼 수요 (연도별/분기별)
-  totalWaferDemand: [{ year: 2024, total: 15000, isEstimate: false }, ...],
-  totalWaferQuarterly: [{ quarter: '24Q1', total: 3700, pw: 2800, epi: 900, isEstimate: false }, ...],
-
-  // Application별 뉴스 검색 쿼리 (Google News RSS + AI 요약에 사용)
-  newsQueries: {
-    traditionalServer: { queryKo: '서버 반도체 수요', queryEn: 'server semiconductor demand' },
-    // ...
-  },
-};
-```
-
-**데이터 갱신 방법**: `yearly[]`에 새 연도, `totalWaferQuarterly[]`에 새 분기 추가. `isEstimate: true`로 표시하면 차트에서 점선으로 표현됩니다.
-
-### 3) `customer-detail-mock.ts` — 고객별 상세
-
-```ts
-// 고객 목록: Memory (SEC, SKHynix, Micron, Koxia) + Foundry (SEC, TSMC, SMC, GFS, STM, Intel)
-export const CUSTOMER_EXECUTIVES: CustomerExecutive[] = [
-  {
-    customerId: 'SEC',
-    label: 'SEC (DRAM/NAND)',
-    type: 'memory',
-    productMix: [{ category: 'DRAM', percentage: 60, color: '#3B82F6' }, ...],
-    kpiMetrics: [{ label: '투입량', value: '120K', unit: 'wpm' }, ...],
-    monthlyMetrics: [
-      { month: '2025-01', waferInput: 120, purchaseVolume: 85, inventoryMonths: 2.1, utilization: 92, ... },
-      // ...
-    ],
-    waferInOutQuarterly: [
-      { quarter: '24Q1', waferIn: 350, waferOut: 340, isEstimate: false, dramRatio: 0.65 },
-      // ...
-    ],
-    bitGrowthQuarterly: [{ quarter: '24Q1', growth: 5.2, isEstimate: false }, ...],
-    news: [{ source: '전자신문', date: '2025-03-01', title: '...', categories: ['투입량'] }, ...],
-    weeklySummary: { weekLabel: 'W10', comment: '...' },
-    // ...
-  },
-  // ... 다른 고객사
-];
-```
-
-**데이터 갱신 방법**:
-- `monthlyMetrics[]`: 새 월 데이터 추가
-- `waferInOutQuarterly[]`: 새 분기 웨이퍼 In/Out 추가
-- `bitGrowthQuarterly[]`: 새 분기 Bit Growth 추가
-- `news[]`: 최신 뉴스 항목 추가
-- `weeklySummary`: 주간 요약 코멘트 갱신
+**파운드리 고객 선택 시:**
+- Foundry 노드별 가동률 차트 (TSMC: 노드 선택, UMC: 비선단 평균)
+- 평균 가동률 = sum(투입량) / sum(CAPA) (가중평균)
 
 ---
 
-## 현황판 데이터 흐름
+## 폴더 구조
 
 ```
-src/data/ (TypeScript Mock)                    현황판 컴포넌트
-┌──────────────────────────┐          ┌──────────────────────────────┐
-│ supply-chain-mock.ts     │ ──────→  │ supply-chain/SupplyChainPage │
-│ (매크로/반도체/장비/앱)    │  import  │ + CategorySidebar            │
-│                          │          │ + IndicatorTable/Chart       │
-├──────────────────────────┤          ├──────────────────────────────┤
-│ vcm-mock.ts              │ ──────→  │ vcm/VcmPage                  │
-│ (Application/Device별    │  import  │ + TotalWaferLineChart        │
-│  수요, 탑재량, 분기별)    │          │ + DemandBarChart             │
-│                          │          │ + DeviceStackedChart         │
-├──────────────────────────┤          ├──────────────────────────────┤
-│ customer-detail-mock.ts  │ ──────→  │ customer-detail/             │
-│ (고객별 KPI, ProductMix, │  import  │   CustomerDetailPage         │
-│  월별지표, 웨이퍼In/Out)  │          │ + ExecutivePanel             │
-│                          │          │ + MonthlyMetricsChart        │
-└──────────────────────────┘          └──────────────────────────────┘
-
-                                      ※ VCM + 고객별 탭에서 /api/news 호출
-                                        (Google News RSS → Claude Haiku 요약)
-                                        뉴스 버튼 토글로 ON/OFF (기본: OFF)
+01_MI_Platform_Dashboard/
+|
++-- src/
+|   +-- app/
+|   |   +-- page.tsx               # "/" -> V3Container (현황판 진입점)
+|   |   +-- api/
+|   |       +-- supply-chain/route.ts  # 전방시장 + Foundry노드 + Server선행 + MemoryPrice
+|   |       +-- vcm/route.ts           # VCM 수요예측
+|   |       +-- customer-detail/route.ts # 고객별 상세
+|   |       +-- news/route.ts          # AI 뉴스 요약
+|   |       +-- transcript/route.ts    # Earnings Transcript AI 요약
+|   |
+|   +-- data/                      # Mock 데이터 (seed 스크립트 전용, 컴포넌트에서 미사용)
+|   |   +-- supply-chain-mock.ts   # 전방시장 + 내부데이터 + Foundry노드
+|   |   +-- vcm-mock.ts            # VCM 수요예측
+|   |   +-- customer-detail-mock.ts # 고객별 상세
+|   |
+|   +-- components/
+|   |   +-- V3Container.tsx        # 현황판 메인 컨테이너 (3탭 전환)
+|   |   +-- supply-chain/          # 탭1 전방시장 (7개 컴포넌트)
+|   |   +-- vcm/                   # 탭2 VCM 수요예측 (4개 컴포넌트)
+|   |   +-- customer-detail/       # 탭3 고객별 상세 (10개 컴포넌트)
+|   |
+|   +-- hooks/                     # API 호출 hooks
+|   |   +-- useSupplyChainData.ts  # 전방시장 + Foundry노드 + Server + MemoryPrice
+|   |   +-- useVcmData.ts
+|   |   +-- useCustomerDetailData.ts
+|   |   +-- useNews.ts
+|   |   +-- useDarkMode.ts
+|   |
+|   +-- lib/
+|   |   +-- db.ts                  # DB 추상화 (SQLite + Postgres 자동 선택)
+|   |   +-- data-generation.ts     # 공통 데이터 생성 유틸 (seededValue, getRecentMonths 등)
+|   |   +-- cache.ts               # 파일+메모리 듀얼 캐시
+|   |   +-- format.ts              # 숫자/통화 포맷
+|   |   +-- news-utils.tsx         # 뉴스 유틸
+|   |
+|   +-- types/
+|       +-- indicators.ts          # 전체 타입 정의
+|
++-- scripts/
+|   +-- seed.ts                    # Mock -> SQLite 변환 (npm run seed)
+|   +-- seed-postgres.ts           # Mock -> Postgres 변환
+|
++-- data/
+|   +-- dashboard.db               # SQLite DB (git 제외)
+|
++-- DATA_GUIDE.md                  # 실데이터 적재 상세 가이드
++-- CLAUDE.md                      # AI 어시스턴트 프로젝트 규칙
 ```
 
-### 뉴스 AI 요약 흐름 (VCM + 고객별 탭)
+---
+
+## 뉴스 AI 요약 흐름
 
 뉴스 패널은 **기본 OFF**이며, 각 탭 상단의 "뉴스" 토글 버튼으로 켜고 끌 수 있습니다.
 
 ```
-vcm-mock.ts의 newsQueries / customer-detail-mock.ts의 newsQuery
-        │
-        ▼
+DB의 newsQuery 메타데이터
+        |
+        v
 GET /api/news?q=서버+반도체+수요&qEn=server+semiconductor+demand
-        │
-        ▼
+        |
+        v
 Google News RSS 검색 (한국어 + 영어)
-        │
-        ▼
+        |
+        v
 Anthropic Claude Haiku 4.5 요약 생성
-        │
-        ▼
+        |
+        v
 cache/news-*.json (24시간 TTL)
-        │
-        ▼
-VCM: InlineNews + WaferDemandAnalysis (VcmPage 내부)
-고객별: CustomerNewsPanel
-```
-
----
-
-## 폴더 구조 (현황판 중심)
-
-```
-01_MI_Platform_Dashboard/
-│
-├── src/
-│   ├── app/
-│   │   ├── layout.tsx             # 루트 레이아웃
-│   │   ├── globals.css            # 전역 CSS (Tailwind 4.1)
-│   │   ├── page.tsx               # "/" → V3Container (현황판 진입점)
-│   │   ├── analysis/page.tsx      # "/analysis" (수정 불필요)
-│   │   └── api/
-│   │       └── news/route.ts      # GET /api/news (뉴스 AI 요약)
-│   │       # ※ api/financials, api/dram-customers 등은 분석 페이지용 (수정 불필요)
-│   │
-│   ├── data/                      # ★ 현황판 핵심 데이터 (수정 대상)
-│   │   ├── supply-chain-mock.ts   #   탭1 전방시장: 카테고리별 월간 지표
-│   │   ├── vcm-mock.ts            #   탭2 VCM: 수요예측, 탑재량, 분기별 웨이퍼
-│   │   └── customer-detail-mock.ts#   탭3 고객별: KPI, ProductMix, 월별지표, 웨이퍼In/Out
-│   │
-│   ├── components/
-│   │   ├── V3Container.tsx        # 현황판 메인 컨테이너 (3탭 전환)
-│   │   ├── supply-chain/          # 탭1 전방시장 (4개 컴포넌트)
-│   │   ├── vcm/                   # 탭2 VCM 수요예측 (4개 컴포넌트)
-│   │   ├── customer-detail/       # 탭3 고객별 상세 (7개 컴포넌트)
-│   │   │
-│   │   # --- 아래는 /analysis 페이지용 (수정 불필요) ---
-│   │   ├── customer-shared/       # 공통 Generic 차트 (7개)
-│   │   ├── dashboard/             # 경쟁사 분석 (9개)
-│   │   └── customer/              # 고객 분석 DRAM/NAND/Foundry (34개)
-│   │
-│   ├── types/
-│   │   └── indicators.ts         # ★ 현황판 타입 정의 (SupplyChain, VCM, CustomerDetail)
-│   │   # ※ company.ts, customer.ts 등은 분석 페이지용
-│   │
-│   ├── hooks/
-│   │   ├── useNews.ts             # 범용 뉴스 fetch hook (VCM 뉴스에 사용)
-│   │   ├── useDarkMode.ts         # 다크모드 토글
-│   │   # ※ useFinancialData, useDramCustomerData 등은 분석 페이지용
-│   │
-│   └── lib/
-│       ├── cache.ts               # 파일+메모리 듀얼 캐시 (24시간 TTL)
-│       ├── news-utils.tsx         # 뉴스 유틸
-│       ├── chart-utils.tsx        # Recharts 공통 유틸
-│       ├── format.ts              # 숫자/통화 포맷
-│       # ※ yahoo-client, dart-client, transform, growth, constants 등은 분석 페이지용
-│
-├── cache/                         # 런타임 캐시 (자동 생성, TTL 24시간)
-│   └── news-*.json                # 뉴스 요약 캐시 (현황판에서 사용)
-│   # ※ financials_all.json, dram_customers.json 등은 분석 페이지용
-│
-├── data/                          # 분석 페이지용 정적 JSON (수정 불필요)
-│   # dram-customers.json, nand-customers.json, foundry-customers.json
-│
-├── package.json
-├── next.config.ts
-└── .gitignore
-```
-
----
-
-## 타입 참조 (`src/types/indicators.ts`)
-
-현황판에서 사용하는 주요 타입들입니다. 데이터 수정 시 이 타입을 참고하세요.
-
-### 전방시장 (탭1)
-
-```ts
-type SupplyChainCategoryId = 'wafer' | 'macro' | 'application' | 'semiconductor' | 'equipment';
-type ViewMode = 'actual' | 'threeMonthMA' | 'twelveMonthMA' | 'mom' | 'yoy';
-type LeadingIndicatorRating = '상' | '중상' | '중' | '중하' | '하';
-
-interface MonthlyData {
-  month: string;       // "2024-01"
-  actual: number;
-  threeMonthMA: number;
-  twelveMonthMA: number;
-  mom: number;         // 전월비 (%)
-  yoy: number;         // 전년비 (%)
-}
-```
-
-### VCM (탭2)
-
-```ts
-type ApplicationType = 'traditionalServer' | 'aiServer' | 'smartphone' | 'pcNotebook'
-                     | 'electricVehicle' | 'ioe' | 'automotive';
-type DeviceType = 'dram' | 'hbm' | 'nand' | 'otherMemory' | 'foundry'
-               | 'logic' | 'analog' | 'discrete' | 'sensor';
-
-interface TotalWaferQuarterlyEntry {
-  quarter: string;     // "24Q1"
-  total: number;
-  pw: number;          // Polished Wafer
-  epi: number;         // Epitaxial Wafer
-  isEstimate: boolean; // true면 차트에서 점선 표시
-}
-```
-
-### 고객별 (탭3)
-
-```ts
-type MemoryCustomerId = 'SEC' | 'SKHynix' | 'Micron' | 'Koxia';
-type FoundryCustomerId = 'SEC_Foundry' | 'TSMC' | 'SMC' | 'GFS' | 'STM' | 'Intel';
-
-interface MonthlyMetricData {
-  month: string;        // "2025-01"
-  waferInput: number;   // 투입량
-  purchaseVolume: number; // 구매량
-  inventoryMonths: number; // 재고월수
-  utilization: number;  // 가동률 (%)
-  inventoryLevel: number;
-  capa: number;
-  dramRatio?: number;   // DRAM 비중
-}
-
-interface WaferInOutQuarterlyEntry {
-  quarter: string;      // "24Q1"
-  waferIn: number;
-  waferOut: number;
-  isEstimate: boolean;
-  dramRatio?: number;
-}
 ```

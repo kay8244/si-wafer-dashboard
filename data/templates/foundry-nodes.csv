@@ -1,0 +1,13 @@
+tab,date,customer,category,value,unit,is_estimate,version,metadata
+supply-chain,2025-01,TSMC_90n,foundry_node,,K/M,0,TSMC,"{""capa"":0,""nodeId"":""90n"",""nodeLabel"":""90nm"",""category"":""mature""}"
+supply-chain,2025-01,TSMC_45n,foundry_node,,K/M,0,TSMC,"{""capa"":0,""nodeId"":""45n"",""nodeLabel"":""45nm"",""category"":""mature""}"
+supply-chain,2025-01,TSMC_28n,foundry_node,,K/M,0,TSMC,"{""capa"":0,""nodeId"":""28n"",""nodeLabel"":""28nm"",""category"":""mature""}"
+supply-chain,2025-01,TSMC_12n,foundry_node,,K/M,0,TSMC,"{""capa"":0,""nodeId"":""12n"",""nodeLabel"":""12nm"",""category"":""mature""}"
+supply-chain,2025-01,TSMC_7n,foundry_node,,K/M,0,TSMC,"{""capa"":0,""nodeId"":""7n"",""nodeLabel"":""7nm"",""category"":""advanced""}"
+supply-chain,2025-01,TSMC_5n,foundry_node,,K/M,0,TSMC,"{""capa"":0,""nodeId"":""5n"",""nodeLabel"":""5nm"",""category"":""advanced""}"
+supply-chain,2025-01,TSMC_3n,foundry_node,,K/M,0,TSMC,"{""capa"":0,""nodeId"":""3n"",""nodeLabel"":""3nm"",""category"":""advanced""}"
+supply-chain,2025-01,TSMC_2n,foundry_node,,K/M,0,TSMC,"{""capa"":0,""nodeId"":""2n"",""nodeLabel"":""2nm"",""category"":""advanced""}"
+supply-chain,2025-01,UMC_90n,foundry_node,,K/M,0,UMC,"{""capa"":0,""nodeId"":""90n"",""nodeLabel"":""90nm"",""category"":""mature""}"
+supply-chain,2025-01,UMC_45n,foundry_node,,K/M,0,UMC,"{""capa"":0,""nodeId"":""45n"",""nodeLabel"":""45nm"",""category"":""mature""}"
+supply-chain,2025-01,UMC_28n,foundry_node,,K/M,0,UMC,"{""capa"":0,""nodeId"":""28n"",""nodeLabel"":""28nm"",""category"":""mature""}"
+supply-chain,2025-01,UMC_12n,foundry_node,,K/M,0,UMC,"{""capa"":0,""nodeId"":""12n"",""nodeLabel"":""12nm"",""category"":""mature""}"

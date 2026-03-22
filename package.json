@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "seed": "npx tsx scripts/seed.ts",
+    "seed:pg": "npx tsx scripts/seed-postgres.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
@@ -14,6 +16,8 @@
     "@types/node": "^25.2.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@vercel/postgres": "^0.10.0",
+    "better-sqlite3": "^12.8.0",
     "eslint": "^9.39.2",
     "eslint-config-next": "^16.1.6",
     "next": "^16.1.6",
@@ -22,7 +26,13 @@
     "react-dom": "^19.2.4",
     "recharts": "^3.7.0",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3",
-    "yahoo-finance2": "^3.13.0"
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/pg": "^8.18.0",
+    "dotenv": "^17.3.1",
+    "pg": "^8.20.0",
+    "tsx": "^4.21.0"
   }
 }

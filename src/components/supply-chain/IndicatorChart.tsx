@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import {
   LineChart,
   Line,
@@ -37,10 +37,15 @@ interface OverlayLine {
 
 interface IndicatorChartProps {
   category: SupplyChainCategory;
-  selectedIndicatorId: string | null;
+  allCategories?: SupplyChainCategory[];
+  selectedIndicatorIds: string[];
+  onToggleIndicator?: (name: string) => void;
   overlayData?: OverlayLine[];
   viewMode?: ViewMode;
 }
+
+// Colors for the 3 selected indicators
+const SELECTED_INDICATOR_COLORS = ['#3B82F6', '#10B981', '#F59E0B'];
 
 const INDICATOR_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#db2777'];
 
@@ -120,37 +125,21 @@ function formatYValue(value: number): string {
 
 export default function IndicatorChart({
   category,
-  selectedIndicatorId,
+  allCategories,
+  selectedIndicatorIds,
+  onToggleIndicator,
   overlayData,
   viewMode = 'actual',
 }: IndicatorChartProps) {
-  const [timeRange, setTimeRange] = useState<TimeRange>(6);
-  const [editingJudgment, setEditingJudgment] = useState<Record<string, string>>({});
-  const [editingId, setEditingId] = useState<string | null>(null);
+  // All indicators across all categories for cross-category selection
+  const allIndicators = (allCategories ?? [category]).flatMap((c) => c.indicators);
+  const [timeRange, setTimeRange] = useState<TimeRange>(12);
   const { isDark } = useDarkMode();
 
-  const getJudgment = useCallback((id: string, original: string) => {
-    return editingJudgment[id] ?? original;
-  }, [editingJudgment]);
-
-  const startEdit = useCallback((id: string, current: string) => {
-    setEditingId(id);
-    setEditingJudgment((prev) => ({ ...prev, [id]: prev[id] ?? current }));
-  }, []);
-
-  const finishEdit = useCallback(() => {
-    setEditingId(null);
-  }, []);
   const gridColor = isDark ? '#334155' : '#e5e7eb';
   const tickColor = isDark ? '#94a3b8' : undefined;
   const tooltipBg = isDark ? { fontSize: 14, borderRadius: 8, backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' } : { fontSize: 14, borderRadius: 8 };
   const hasOverlay = overlayData && overlayData.length > 0;
-
-  // Determine which indicators to show
-  const indicators =
-    selectedIndicatorId !== null
-      ? category.indicators.filter((ind) => ind.id === selectedIndicatorId)
-      : category.indicators;
 
   // XAxis interval: 12M→0 (all), 24M→1 (every other), 36M→2 (every 3rd)
   const xAxisInterval = Math.max(0, Math.floor(timeRange / 12) - 1);
@@ -176,16 +165,50 @@ export default function IndicatorChart({
     </div>
   );
 
-  // ── Single indicator selected ──
-  if (selectedIndicatorId !== null && indicators.length > 0) {
-    const ind = indicators[0];
-    const vmLine = VIEW_MODE_LINE[viewMode];
-    const slicedMonthly = ind.monthly.slice(-timeRange);
+  // Determine selected indicators in order (search ALL categories by name)
+  const selectedInds = selectedIndicatorIds
+    .map((name) => allIndicators.find((ind) => ind.name === name))
+    .filter((ind): ind is NonNullable<typeof ind> => ind !== undefined);
 
-    // Compute correlation between external indicator and each overlay
+  // ── One or more indicators selected ──
+  if (selectedInds.length > 0) {
+    // Build unified month axis from first indicator
+    const refMonthly = selectedInds[0].monthly.slice(-timeRange);
+    const refMonths = refMonthly.map((m) => m.month);
+
+    // Build chart data: one row per month, columns per indicator + overlays
+    const chartData = refMonths.map((month) => {
+      const entry: Record<string, string | number> = {
+        month: month.slice(2).replace('-', '.'),
+      };
+      selectedInds.forEach((ind) => {
+        const m = ind.monthly.find((x) => x.month === month);
+        entry[ind.name] = m ? getFieldValue(m, viewMode) : 0;
+      });
+      if (overlayData) {
+        overlayData.forEach((ol) => {
+          const point = ol.data.find((d) => d.month === month);
+          entry[ol.name] = point?.value ?? 0;
+        });
+      }
+      return entry;
+    });
+
+    // Y-axis domains per indicator (independent scales)
+    const indDomains = selectedInds.map((ind) => {
+      const vals = ind.monthly.slice(-timeRange).map((m) => getFieldValue(m, viewMode));
+      return tightDomain(vals);
+    });
+
+    // Right Y domain — overlay values
+    const monthSet = new Set(refMonths);
+    const allRightValues = overlayData?.flatMap((ol) => ol.data.filter((d) => monthSet.has(d.month)).map((d) => d.value)) ?? [];
+    const rightDomain = tightDomain(allRightValues);
+
+    // Correlation badges (first indicator vs overlays)
     const correlations: { name: string; r: number; color: string }[] = [];
-    if (overlayData && overlayData.length > 0) {
-      const extByMonth = new Map(slicedMonthly.map((m) => [m.month, getFieldValue(m, viewMode)]));
+    if (overlayData && overlayData.length > 0 && selectedInds.length > 0) {
+      const extByMonth = new Map(refMonthly.map((m) => [m.month, getFieldValue(m, viewMode)]));
       overlayData.forEach((ol) => {
         const pairs: { x: number; y: number }[] = [];
         ol.data.forEach((d) => {
@@ -197,189 +220,167 @@ export default function IndicatorChart({
       });
     }
 
-    const chartData = slicedMonthly.map((m) => {
-      const entry: Record<string, string | number> = {
-        month: m.month.slice(2).replace('-', '.'),
-        [vmLine.label]: getFieldValue(m, viewMode),
-      };
-      if (overlayData) {
-        overlayData.forEach((ol) => {
-          const point = ol.data.find((d) => d.month === m.month);
-          entry[ol.name] = point?.value ?? 0;
-        });
-      }
-      return entry;
-    });
-
-    // Left Y domain — tight scale around sliced viewMode values
-    const allLeftValues = slicedMonthly.map((m) => getFieldValue(m, viewMode));
-    const leftDomain = tightDomain(allLeftValues);
-
-    // Right Y domain — tight scale around overlay values (filtered to time range)
-    const slicedMonths = new Set(slicedMonthly.map((m) => m.month));
-    const allRightValues = overlayData?.flatMap((ol) => ol.data.filter((d) => slicedMonths.has(d.month)).map((d) => d.value)) ?? [];
-    const rightDomain = tightDomain(allRightValues);
+    // yAxisId assignment:
+    // ind[0] → 'ind0' (left axis rendered)
+    // ind[1] → 'ind1' (right axis rendered)
+    // ind[2] → 'ind2' (hidden axis — tooltip only)
+    // overlays → 'overlay' (right axis when no 2nd indicator, else hidden)
+    const getIndAxisId = (idx: number) => `ind${idx}`;
+    const overlayAxisId = selectedInds.length <= 1 ? 'overlay' : 'ind1';
 
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-md">
         {/* Title + Time Range Selector */}
-        <div className="mb-1 flex items-start justify-between">
-          <div>
-            <p className="flex items-center gap-2 text-lg font-bold text-gray-800">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded bg-gray-700 text-xs font-bold text-white">
-                {ind.id}
+        <div className="mb-3 flex items-start justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedInds.map((ind, idx) => (
+              <span
+                key={ind.name}
+                className={`flex items-center gap-1.5 text-sm font-semibold text-gray-800 ${onToggleIndicator ? 'cursor-pointer hover:opacity-70' : ''}`}
+                onClick={() => onToggleIndicator?.(ind.name)}
+                title={onToggleIndicator ? '클릭하여 선택 해제' : undefined}
+              >
+                <span
+                  className="inline-block h-3 w-3 rounded-full"
+                  style={{ backgroundColor: SELECTED_INDICATOR_COLORS[idx] }}
+                />
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-gray-700 text-xs font-bold text-white">
+                  {ind.id}
+                </span>
+                {ind.name}
+                <span className="font-normal text-gray-400">({ind.unit})</span>
+                {onToggleIndicator && <span className="ml-0.5 text-gray-300 text-xs">✕</span>}
+                {idx < selectedInds.length - 1 && <span className="text-gray-300">|</span>}
               </span>
-              {ind.leadingRating && (() => {
-                const badge = leadingRatingBadge(ind.leadingRating);
-                return (
-                  <span className={`inline-block rounded-md px-2 py-0.5 text-sm font-bold ${badge.bg} ${badge.text}`}>
-                    {ind.leadingRating}
-                  </span>
-                );
-              })()}
-              {ind.name}
-              <span className="text-sm font-normal text-gray-400">({ind.unit}) — {vmLine.label}</span>
-              {hasOverlay && (
-                <span className="text-sm font-normal text-gray-400">| 오른쪽 축: 내부 데이터</span>
-              )}
-            </p>
+            ))}
+            {hasOverlay && (
+              <span className="text-sm font-normal text-gray-400 ml-1">| 오른쪽 축: 내부 데이터</span>
+            )}
           </div>
           {TimeRangeSelector}
         </div>
-        {/* Judgment banner — editable */}
-        {(() => {
-          const judgmentText = getJudgment(ind.id, ind.judgment ?? '');
-          const isEditing = editingId === ind.id;
-          return (
-            <div className="mb-3 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-              <span className="mr-1.5 font-semibold text-blue-600 dark:text-blue-400">판단:</span>
-              {isEditing ? (
-                <textarea
-                  className="mt-1 w-full rounded border border-blue-300 bg-white px-2 py-1.5 text-sm text-gray-800 shadow-inner focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-blue-600 dark:bg-gray-700 dark:text-gray-200"
-                  rows={2}
-                  value={editingJudgment[ind.id] ?? judgmentText}
-                  onChange={(e) => setEditingJudgment((prev) => ({ ...prev, [ind.id]: e.target.value }))}
-                  onBlur={finishEdit}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      finishEdit();
-                    }
-                  }}
-                  autoFocus
-                />
-              ) : (
-                <span
-                  className="cursor-pointer rounded px-1 -mx-1 hover:bg-blue-100/60 dark:hover:bg-blue-800/40 transition-colors"
-                  onClick={() => startEdit(ind.id, judgmentText)}
-                  title="클릭하여 수정"
-                >
-                  {judgmentText || <span className="italic text-gray-400">판단을 입력하세요</span>}
-                </span>
-              )}
-            </div>
-          );
-        })()}
+
         <div className="relative">
-        {/* Correlation badges — positioned inside chart area */}
-        {correlations.length > 0 && (
-          <div className="absolute top-7 right-24 z-10 flex flex-col gap-1">
-            {correlations.map((c) => {
-              const info = corrLabel(c.r);
-              return (
-                <div
-                  key={c.name}
-                  className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold shadow-sm backdrop-blur-sm"
-                  style={{
-                    borderColor: c.color + '40',
-                    backgroundColor: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.9)',
-                  }}
-                >
-                  <span
-                    className="inline-block h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: c.color }}
-                  />
-                  <span style={{ color: isDark ? '#e2e8f0' : '#374151' }}>
-                    {c.name.split(' (')[0]}
-                  </span>
-                  <span style={{ color: info.color, fontWeight: 700 }}>
-                    r={c.r >= 0 ? '+' : ''}{c.r.toFixed(2)}
-                  </span>
-                  <span style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
-                    ({info.text} {c.r >= 0 ? '양' : '음'}의 상관)
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={chartData} margin={{ top: 20, right: hasOverlay ? 16 : 16, left: 0, bottom: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis dataKey="month" tick={{ fontSize: xTickFontSize, fill: tickColor }} interval={xAxisInterval} />
-            {/* Left Y — single viewMode line with tight domain */}
-            <YAxis
-              yAxisId="left"
-              tick={{ fontSize: 14, fill: tickColor }}
-              width={65}
-              domain={leftDomain}
-              tickFormatter={formatYValue}
-              stroke="#6b7280"
-            />
-            {/* Right Y — overlay data (only when overlay exists) */}
-            {hasOverlay && (
+          {/* Correlation badges */}
+          {correlations.length > 0 && (
+            <div className="absolute top-7 right-24 z-10 flex flex-col gap-1">
+              {correlations.map((c) => {
+                const info = corrLabel(c.r);
+                return (
+                  <div
+                    key={c.name}
+                    className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold shadow-sm backdrop-blur-sm"
+                    style={{
+                      borderColor: c.color + '40',
+                      backgroundColor: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.9)',
+                    }}
+                  >
+                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color }} />
+                    <span style={{ color: isDark ? '#e2e8f0' : '#374151' }}>{c.name.split(' (')[0]}</span>
+                    <span style={{ color: info.color, fontWeight: 700 }}>r={c.r >= 0 ? '+' : ''}{c.r.toFixed(2)}</span>
+                    <span style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>({info.text} {c.r >= 0 ? '양' : '음'}의 상관)</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="month" tick={{ fontSize: xTickFontSize, fill: tickColor }} interval={xAxisInterval} />
+
+              {/* Left Y — first indicator */}
               <YAxis
-                yAxisId="right"
-                orientation="right"
-                tick={{ fontSize: 14, fill: tickColor }}
-                width={65}
-                domain={rightDomain}
+                yAxisId="ind0"
+                tick={{ fontSize: 13, fill: tickColor }}
+                width={60}
+                domain={indDomains[0]}
                 tickFormatter={formatYValue}
-                stroke="#9ca3af"
+                stroke={SELECTED_INDICATOR_COLORS[0]}
               />
-            )}
-            <Tooltip contentStyle={tooltipBg} />
-            <Legend wrapperStyle={{ fontSize: 14 }} />
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey={vmLine.label}
-              stroke={vmLine.color}
-              strokeWidth={2}
-              dot={{ r: timeRange <= 12 ? 3 : 2 }}
-            >
-              {showValueLabels && (
-                <LabelList
-                  dataKey={vmLine.label}
-                  position="top"
-                  formatter={(v: unknown) => formatYValue(Number(v))}
-                  style={{ fontSize: 12, fill: vmLine.color, fontWeight: 600 }}
+
+              {/* Right Y — second indicator or overlay */}
+              {selectedInds.length >= 2 ? (
+                <YAxis
+                  yAxisId="ind1"
+                  orientation="right"
+                  tick={{ fontSize: 13, fill: tickColor }}
+                  width={60}
+                  domain={indDomains[1]}
+                  tickFormatter={formatYValue}
+                  stroke={SELECTED_INDICATOR_COLORS[1]}
+                />
+              ) : hasOverlay ? (
+                <YAxis
+                  yAxisId="overlay"
+                  orientation="right"
+                  tick={{ fontSize: 13, fill: tickColor }}
+                  width={60}
+                  domain={rightDomain}
+                  tickFormatter={formatYValue}
+                  stroke="#9ca3af"
+                />
+              ) : null}
+
+              {/* Hidden Y axis for 3rd indicator (tooltip only) */}
+              {selectedInds.length >= 3 && (
+                <YAxis
+                  yAxisId="ind2"
+                  hide
+                  domain={indDomains[2]}
                 />
               )}
-            </Line>
-            {overlayData?.map((ol) => (
-              <Line
-                key={ol.name}
-                yAxisId="right"
-                type="monotone"
-                dataKey={ol.name}
-                stroke={ol.color}
-                strokeWidth={2}
-                dot={{ r: timeRange <= 12 ? 3 : 2, fill: ol.color }}
-                strokeDasharray="6 3"
-              >
-                {showValueLabels && (
-                  <LabelList
-                    dataKey={ol.name}
-                    position="bottom"
-                    formatter={(v: unknown) => formatYValue(Number(v))}
-                    style={{ fontSize: 10, fill: ol.color, fontWeight: 600 }}
-                  />
-                )}
-              </Line>
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+
+              <Tooltip contentStyle={tooltipBg} />
+              <Legend wrapperStyle={{ fontSize: 13 }} />
+
+              {/* Indicator lines */}
+              {selectedInds.map((ind, idx) => (
+                <Line
+                  key={ind.name}
+                  yAxisId={getIndAxisId(idx)}
+                  type="monotone"
+                  dataKey={ind.name}
+                  stroke={SELECTED_INDICATOR_COLORS[idx]}
+                  strokeWidth={2}
+                  dot={{ r: timeRange <= 12 ? 3 : 2 }}
+                >
+                  {showValueLabels && (
+                    <LabelList
+                      dataKey={ind.name}
+                      position={idx % 2 === 0 ? 'top' : 'bottom'}
+                      formatter={(v: unknown) => formatYValue(Number(v))}
+                      style={{ fontSize: 11, fill: SELECTED_INDICATOR_COLORS[idx], fontWeight: 600 }}
+                    />
+                  )}
+                </Line>
+              ))}
+
+              {/* Overlay lines */}
+              {overlayData?.map((ol) => (
+                <Line
+                  key={ol.name}
+                  yAxisId={overlayAxisId}
+                  type="monotone"
+                  dataKey={ol.name}
+                  stroke={ol.color}
+                  strokeWidth={2}
+                  dot={{ r: timeRange <= 12 ? 3 : 2, fill: ol.color }}
+                  strokeDasharray="6 3"
+                >
+                  {showValueLabels && (
+                    <LabelList
+                      dataKey={ol.name}
+                      position="bottom"
+                      formatter={(v: unknown) => formatYValue(Number(v))}
+                      style={{ fontSize: 10, fill: ol.color, fontWeight: 600 }}
+                    />
+                  )}
+                </Line>
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </div>
     );
@@ -435,7 +436,7 @@ export default function IndicatorChart({
         {TimeRangeSelector}
       </div>
       <ResponsiveContainer width="100%" height={320}>
-        <LineChart data={chartData} margin={{ top: 20, right: hasOverlay ? 16 : 16, left: 0, bottom: 4 }}>
+        <LineChart data={chartData} margin={{ top: 20, right: hasOverlay ? 30 : 16, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
           <XAxis dataKey="month" tick={{ fontSize: 14, fill: tickColor }} />
           {/* Left Y — indicator data */}
@@ -463,7 +464,7 @@ export default function IndicatorChart({
           <Legend wrapperStyle={{ fontSize: 14 }} />
           {category.indicators.map((ind, idx) => (
             <Line
-              key={ind.id}
+              key={ind.name}
               yAxisId="left"
               type="monotone"
               dataKey={ind.name}
