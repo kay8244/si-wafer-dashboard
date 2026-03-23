@@ -12,6 +12,12 @@ import {
   VCM_VERSIONS,
   NEWS_QUERIES_BY_CATEGORY,
   MOUNT_PER_UNIT_BY_CATEGORY,
+  TOTAL_WAFER_YEARLY,
+  DEVICE_STACKED_YEARLY,
+  APP_YEARLY_DEMANDS,
+  DEVICE_STACKED_YEARLY_BY_APP,
+  TOTAL_WAFER_DEMAND_BY_APP,
+  YEARLY_MOUNT_PER_UNIT_BY_CATEGORY,
 } from '../src/data/vcm-mock';
 import { CUSTOMER_LIST, CUSTOMER_EXECUTIVES } from '../src/data/customer-detail-mock';
 
@@ -377,6 +383,130 @@ function seedVcm(): Row[] {
         JSON.stringify({ queryKo: query.queryKo, queryEn: query.queryEn }),
       ),
     );
+  }
+
+  return rows;
+}
+
+// ── 2b. VCM Yearly ──────────────────────────────────────────────────────────
+
+function seedVcmYearly(): Row[] {
+  const rows: Row[] = [];
+
+  // 1. TOTAL_WAFER_YEARLY
+  for (const entry of TOTAL_WAFER_YEARLY) {
+    rows.push(
+      row(
+        'vcm',
+        entry.year.toString(),
+        'Total',
+        'totalWaferYearly',
+        entry.total,
+        'K/M',
+        entry.isEstimate ? 1 : 0,
+        null,
+        JSON.stringify({ pw: entry.pw, epi: entry.epi }),
+      ),
+    );
+  }
+
+  // 2. DEVICE_STACKED_YEARLY
+  for (const entry of DEVICE_STACKED_YEARLY) {
+    rows.push(
+      row(
+        'vcm',
+        entry.year.toString(),
+        'All',
+        'deviceStackedYearly',
+        null,
+        'K/M',
+        entry.isEstimate ? 1 : 0,
+        null,
+        JSON.stringify({
+          dram: entry.dram, hbm: entry.hbm, nand: entry.nand,
+          otherMemory: entry.otherMemory, logic: entry.logic,
+          analog: entry.analog, discrete: entry.discrete, sensor: entry.sensor,
+        }),
+      ),
+    );
+  }
+
+  // 3. APP_YEARLY_DEMANDS
+  for (const [appKey, values] of Object.entries(APP_YEARLY_DEMANDS)) {
+    for (const v of values) {
+      rows.push(
+        row(
+          'vcm',
+          v.year.toString(),
+          appKey,
+          'appYearlyDemand',
+          v.value,
+          'units',
+          v.isEstimate ? 1 : 0,
+        ),
+      );
+    }
+  }
+
+  // 4. DEVICE_STACKED_YEARLY_BY_APP
+  for (const [appKey, entries] of Object.entries(DEVICE_STACKED_YEARLY_BY_APP)) {
+    for (const entry of entries) {
+      rows.push(
+        row(
+          'vcm',
+          entry.year.toString(),
+          appKey,
+          'deviceStackedYearlyByApp',
+          null,
+          'K/M',
+          entry.isEstimate ? 1 : 0,
+          null,
+          JSON.stringify({
+            dram: entry.dram, hbm: entry.hbm, nand: entry.nand,
+            otherMemory: entry.otherMemory, logic: entry.logic,
+            analog: entry.analog, discrete: entry.discrete, sensor: entry.sensor,
+          }),
+        ),
+      );
+    }
+  }
+
+  // 5. TOTAL_WAFER_DEMAND_BY_APP (yearly total wafer demand per app)
+  for (const [appKey, totals] of Object.entries(TOTAL_WAFER_DEMAND_BY_APP)) {
+    for (const t of totals) {
+      rows.push(
+        row(
+          'vcm',
+          t.year.toString(),
+          appKey,
+          'totalWaferDemandByAppYearly',
+          t.total,
+          'K/M',
+          t.isEstimate ? 1 : 0,
+        ),
+      );
+    }
+  }
+
+  // 6. YEARLY_MOUNT_PER_UNIT_BY_CATEGORY
+  for (const [catKey, entries] of Object.entries(YEARLY_MOUNT_PER_UNIT_BY_CATEGORY)) {
+    for (const entry of entries) {
+      for (const metric of entry.metrics) {
+        rows.push(
+          row(
+            'vcm',
+            metric.year.toString(),
+            entry.label,
+            'yearlyMountPerUnitByCategory',
+            metric.value,
+            metric.unit,
+            0,
+            null,
+            JSON.stringify({ categoryType: catKey, serverType: entry.serverType }),
+          ),
+        );
+      }
+    }
   }
 
   return rows;
@@ -1006,6 +1136,12 @@ function main() {
   insertMany(vcmRows);
   console.log(` ${vcmRows.length} rows`);
 
+  // VCM Yearly
+  process.stdout.write('Seeding vcm-yearly...');
+  const vcmYearlyRows = seedVcmYearly();
+  insertMany(vcmYearlyRows);
+  console.log(` ${vcmYearlyRows.length} rows`);
+
   // Customer Detail
   process.stdout.write('Seeding customer-detail...');
   const cdRows = seedCustomerDetail();
@@ -1036,7 +1172,7 @@ function main() {
   insertMany(mpRows);
   console.log(` ${mpRows.length} rows`);
 
-  const total = scRows.length + vcmRows.length + cdRows.length + imRows.length + fnRows.length + siRows.length + mpRows.length;
+  const total = scRows.length + vcmRows.length + vcmYearlyRows.length + cdRows.length + imRows.length + fnRows.length + siRows.length + mpRows.length;
   console.log(`Total: ${total} rows`);
 }
 

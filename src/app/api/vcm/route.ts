@@ -15,8 +15,10 @@ import type {
   VcmNews,
   QuarterlyValue,
   DeviceStackedEntry,
+  TotalWaferYearlyEntry,
+  DeviceStackedYearlyEntry,
+  YearlyValue,
 } from '@/types/indicators';
-import { TOTAL_WAFER_YEARLY, DEVICE_STACKED_YEARLY, APP_YEARLY_DEMANDS, DEVICE_STACKED_YEARLY_BY_APP, TOTAL_WAFER_DEMAND_BY_APP as TOTAL_WAFER_DEMAND_BY_APP_MOCK, YEARLY_MOUNT_PER_UNIT_BY_CATEGORY } from '@/data/vcm-mock';
 
 function parseMeta<T>(row: MetricRow): T {
   try {
@@ -344,24 +346,147 @@ export async function GET() {
     quarterlyMountPerUnit,
   };
 
-  // Merge DB totalWaferDemandByApp with mock data for years not in DB (2027-2030)
-  const mergedTotalWaferDemandByApp: Record<string, TotalWaferDemand[]> = {};
-  for (const [app, mockRows] of Object.entries(TOTAL_WAFER_DEMAND_BY_APP_MOCK)) {
-    const dbRows = totalWaferDemandByApp[app as ApplicationType] ?? [];
-    const dbYears = new Set(dbRows.map((r) => r.year));
-    const extra = mockRows.filter((r) => !dbYears.has(r.year));
-    mergedTotalWaferDemandByApp[app] = [...dbRows, ...extra].sort((a, b) => a.year - b.year);
+  // ── totalWaferYearly ─────────────────────────────────────────────────────
+  // category='totalWaferYearly', customer='Total', date=year, value=total, metadata={pw, epi}
+  const twYearlyRows = byCategory['totalWaferYearly'] ?? [];
+  const totalWaferYearly: TotalWaferYearlyEntry[] = twYearlyRows
+    .map((r) => {
+      const meta = parseMeta<{ pw?: number; epi?: number }>(r);
+      return {
+        year: parseInt(r.date, 10),
+        total: r.value ?? 0,
+        pw: meta.pw ?? 0,
+        epi: meta.epi ?? 0,
+        isEstimate: r.is_estimate === 1,
+      };
+    })
+    .sort((a, b) => a.year - b.year);
+
+  // ── deviceStackedYearly ────────────────────────────────────────────────
+  // category='deviceStackedYearly', customer='All', date=year, metadata={dram,hbm,...}
+  const dsYearlyRows = byCategory['deviceStackedYearly'] ?? [];
+  const deviceStackedYearly: DeviceStackedYearlyEntry[] = dsYearlyRows
+    .map((r) => {
+      const meta = parseMeta<Record<string, number>>(r);
+      return {
+        year: parseInt(r.date, 10),
+        isEstimate: r.is_estimate === 1,
+        dram: meta.dram ?? 0,
+        hbm: meta.hbm ?? 0,
+        nand: meta.nand ?? 0,
+        otherMemory: meta.otherMemory ?? 0,
+        logic: meta.logic ?? 0,
+        analog: meta.analog ?? 0,
+        discrete: meta.discrete ?? 0,
+        sensor: meta.sensor ?? 0,
+      };
+    })
+    .sort((a, b) => a.year - b.year);
+
+  // ── appYearlyDemands ───────────────────────────────────────────────────
+  // category='appYearlyDemand', customer=appKey, date=year, value=demand
+  const appYearlyRows = byCategory['appYearlyDemand'] ?? [];
+  const appYearlyMap: Record<string, YearlyValue[]> = {};
+  for (const r of appYearlyRows) {
+    const app = r.customer;
+    if (!appYearlyMap[app]) appYearlyMap[app] = [];
+    appYearlyMap[app].push({
+      year: parseInt(r.date, 10),
+      value: r.value ?? 0,
+      isEstimate: r.is_estimate === 1,
+    });
   }
+  for (const v of Object.values(appYearlyMap)) v.sort((a, b) => a.year - b.year);
+  const appYearlyDemands = appYearlyMap as Record<ApplicationType, YearlyValue[]>;
+
+  // ── deviceStackedYearlyByApp ───────────────────────────────────────────
+  // category='deviceStackedYearlyByApp', customer=appKey, date=year, metadata={dram,...}
+  const dsYearlyByAppRows = byCategory['deviceStackedYearlyByApp'] ?? [];
+  const dsYearlyByAppMap: Record<string, DeviceStackedYearlyEntry[]> = {};
+  for (const r of dsYearlyByAppRows) {
+    const app = r.customer;
+    const meta = parseMeta<Record<string, number>>(r);
+    if (!dsYearlyByAppMap[app]) dsYearlyByAppMap[app] = [];
+    dsYearlyByAppMap[app].push({
+      year: parseInt(r.date, 10),
+      isEstimate: r.is_estimate === 1,
+      dram: meta.dram ?? 0,
+      hbm: meta.hbm ?? 0,
+      nand: meta.nand ?? 0,
+      otherMemory: meta.otherMemory ?? 0,
+      logic: meta.logic ?? 0,
+      analog: meta.analog ?? 0,
+      discrete: meta.discrete ?? 0,
+      sensor: meta.sensor ?? 0,
+    });
+  }
+  for (const v of Object.values(dsYearlyByAppMap)) v.sort((a, b) => a.year - b.year);
+  const deviceStackedYearlyByApp = dsYearlyByAppMap as Record<ApplicationType, DeviceStackedYearlyEntry[]>;
+
+  // ── totalWaferDemandByApp (yearly, from new category) ──────────────────
+  // category='totalWaferDemandByAppYearly', customer=appKey, date=year, value=total
+  const twdByAppYearlyRows = byCategory['totalWaferDemandByAppYearly'] ?? [];
+  const twdByAppYearlyMap: Record<string, TotalWaferDemand[]> = {};
+  for (const r of twdByAppYearlyRows) {
+    const app = r.customer;
+    if (!twdByAppYearlyMap[app]) twdByAppYearlyMap[app] = [];
+    twdByAppYearlyMap[app].push({
+      year: parseInt(r.date, 10),
+      total: r.value ?? 0,
+      isEstimate: r.is_estimate === 1,
+    });
+  }
+  for (const v of Object.values(twdByAppYearlyMap)) v.sort((a, b) => a.year - b.year);
+  // Merge the quarterly-derived totalWaferDemandByApp with the yearly version
+  const mergedTotalWaferDemandByApp: Record<string, TotalWaferDemand[]> = {};
+  const allAppKeys = new Set([...Object.keys(totalByAppMap), ...Object.keys(twdByAppYearlyMap)]);
+  for (const app of allAppKeys) {
+    const quarterlyRows2 = totalByAppMap[app] ?? [];
+    const yearlyRows2 = twdByAppYearlyMap[app] ?? [];
+    const qYears = new Set(quarterlyRows2.map((r) => r.year));
+    const extra = yearlyRows2.filter((r) => !qYears.has(r.year));
+    mergedTotalWaferDemandByApp[app] = [...quarterlyRows2, ...extra].sort((a, b) => a.year - b.year);
+  }
+
+  // ── yearlyMountPerUnitByCategory ───────────────────────────────────────
+  // category='yearlyMountPerUnitByCategory', customer=label, date=year,
+  //   value=value, unit=unit, metadata={categoryType, serverType}
+  const ymRows = byCategory['yearlyMountPerUnitByCategory'] ?? [];
+  const ymByCatMap: Record<string, MountPerUnit[]> = {};
+  for (const r of ymRows) {
+    const meta = parseMeta<{ categoryType?: string; serverType?: string }>(r);
+    const catType = meta.categoryType ?? 'unknown';
+    const serverType = (meta.serverType ?? 'traditional') as MountPerUnit['serverType'];
+    const label = r.customer;
+    if (!ymByCatMap[catType]) ymByCatMap[catType] = [];
+    // Find or create the entry in the array
+    let entry = ymByCatMap[catType].find(
+      (e) => e.serverType === serverType && e.label === label,
+    );
+    if (!entry) {
+      entry = { serverType, label, metrics: [] };
+      ymByCatMap[catType].push(entry);
+    }
+    entry.metrics.push({
+      year: parseInt(r.date, 10),
+      value: r.value ?? 0,
+      unit: r.unit ?? '',
+    });
+  }
+  for (const entries of Object.values(ymByCatMap)) {
+    for (const e of entries) e.metrics.sort((a, b) => a.year - b.year);
+  }
+  const yearlyMountPerUnitByCategory = ymByCatMap as Record<AppCategoryType, MountPerUnit[]>;
 
   return NextResponse.json({
     ...vcmData,
     totalWaferDemandByApp: mergedTotalWaferDemandByApp,
     newsQueriesByCategory,
     mountPerUnitByCategory,
-    yearlyMountPerUnitByCategory: YEARLY_MOUNT_PER_UNIT_BY_CATEGORY,
-    totalWaferYearly: TOTAL_WAFER_YEARLY,
-    deviceStackedYearly: DEVICE_STACKED_YEARLY,
-    appYearlyDemands: APP_YEARLY_DEMANDS,
-    deviceStackedYearlyByApp: DEVICE_STACKED_YEARLY_BY_APP,
+    yearlyMountPerUnitByCategory,
+    totalWaferYearly,
+    deviceStackedYearly,
+    appYearlyDemands,
+    deviceStackedYearlyByApp,
   });
 }

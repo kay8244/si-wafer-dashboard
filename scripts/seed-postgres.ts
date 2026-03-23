@@ -18,6 +18,12 @@ import {
   VCM_VERSIONS,
   NEWS_QUERIES_BY_CATEGORY,
   MOUNT_PER_UNIT_BY_CATEGORY,
+  TOTAL_WAFER_YEARLY,
+  DEVICE_STACKED_YEARLY,
+  APP_YEARLY_DEMANDS,
+  DEVICE_STACKED_YEARLY_BY_APP,
+  TOTAL_WAFER_DEMAND_BY_APP,
+  YEARLY_MOUNT_PER_UNIT_BY_CATEGORY,
 } from '../src/data/vcm-mock';
 import { CUSTOMER_LIST, CUSTOMER_EXECUTIVES } from '../src/data/customer-detail-mock';
 
@@ -220,6 +226,54 @@ function seedVcm(): Row[] {
 
   for (const [appKey, query] of Object.entries(VCM_DATA.newsQueries)) {
     rows.push(row('vcm', '_meta', appKey, 'newsQuery', null, null, 0, null, JSON.stringify({ queryKo: query.queryKo, queryEn: query.queryEn })));
+  }
+
+  return rows;
+}
+
+// ── 2b. VCM Yearly ──────────────────────────────────────────────────────────
+
+function seedVcmYearly(): Row[] {
+  const rows: Row[] = [];
+
+  // 1. TOTAL_WAFER_YEARLY
+  for (const entry of TOTAL_WAFER_YEARLY) {
+    rows.push(row('vcm', entry.year.toString(), 'Total', 'totalWaferYearly', entry.total, 'K/M', entry.isEstimate ? 1 : 0, null, JSON.stringify({ pw: entry.pw, epi: entry.epi })));
+  }
+
+  // 2. DEVICE_STACKED_YEARLY
+  for (const entry of DEVICE_STACKED_YEARLY) {
+    rows.push(row('vcm', entry.year.toString(), 'All', 'deviceStackedYearly', null, 'K/M', entry.isEstimate ? 1 : 0, null, JSON.stringify({ dram: entry.dram, hbm: entry.hbm, nand: entry.nand, otherMemory: entry.otherMemory, logic: entry.logic, analog: entry.analog, discrete: entry.discrete, sensor: entry.sensor })));
+  }
+
+  // 3. APP_YEARLY_DEMANDS
+  for (const [appKey, values] of Object.entries(APP_YEARLY_DEMANDS)) {
+    for (const v of values) {
+      rows.push(row('vcm', v.year.toString(), appKey, 'appYearlyDemand', v.value, 'units', v.isEstimate ? 1 : 0));
+    }
+  }
+
+  // 4. DEVICE_STACKED_YEARLY_BY_APP
+  for (const [appKey, entries] of Object.entries(DEVICE_STACKED_YEARLY_BY_APP)) {
+    for (const entry of entries) {
+      rows.push(row('vcm', entry.year.toString(), appKey, 'deviceStackedYearlyByApp', null, 'K/M', entry.isEstimate ? 1 : 0, null, JSON.stringify({ dram: entry.dram, hbm: entry.hbm, nand: entry.nand, otherMemory: entry.otherMemory, logic: entry.logic, analog: entry.analog, discrete: entry.discrete, sensor: entry.sensor })));
+    }
+  }
+
+  // 5. TOTAL_WAFER_DEMAND_BY_APP (yearly)
+  for (const [appKey, totals] of Object.entries(TOTAL_WAFER_DEMAND_BY_APP)) {
+    for (const t of totals) {
+      rows.push(row('vcm', t.year.toString(), appKey, 'totalWaferDemandByAppYearly', t.total, 'K/M', t.isEstimate ? 1 : 0));
+    }
+  }
+
+  // 6. YEARLY_MOUNT_PER_UNIT_BY_CATEGORY
+  for (const [catKey, entries] of Object.entries(YEARLY_MOUNT_PER_UNIT_BY_CATEGORY)) {
+    for (const entry of entries) {
+      for (const metric of entry.metrics) {
+        rows.push(row('vcm', metric.year.toString(), entry.label, 'yearlyMountPerUnitByCategory', metric.value, metric.unit, 0, null, JSON.stringify({ categoryType: catKey, serverType: entry.serverType })));
+      }
+    }
   }
 
   return rows;
@@ -643,6 +697,9 @@ async function main() {
     const vcmRows = seedVcm();
     await insertRows('vcm', vcmRows);
 
+    const vcmYearlyRows = seedVcmYearly();
+    await insertRows('vcm-yearly', vcmYearlyRows);
+
     const cdRows = seedCustomerDetail();
     await insertRows('customer-detail', cdRows);
 
@@ -658,7 +715,7 @@ async function main() {
     const mpRows = seedMemoryPriceIndicators();
     await insertRows('memory-price', mpRows);
 
-    const total = scRows.length + vcmRows.length + cdRows.length + imRows.length + fnRows.length + siRows.length + mpRows.length;
+    const total = scRows.length + vcmRows.length + vcmYearlyRows.length + cdRows.length + imRows.length + fnRows.length + siRows.length + mpRows.length;
     console.log(`Total: ${total} rows`);
   } finally {
     client.release();

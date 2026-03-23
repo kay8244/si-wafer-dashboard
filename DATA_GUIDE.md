@@ -31,7 +31,7 @@ ANTHROPIC_API_KEY=sk-ant-...   # 뉴스 AI 요약 기능용 (선택)
 TAVILY_API_KEY=tvly-...        # 뉴스 검색용 (선택)
 
 # 3. 목업 데이터로 DB 생성 (테스트용)
-npm run seed                          # SQLite (18,092 rows)
+npm run seed                          # SQLite (18,471 rows)
 npx tsx scripts/seed-postgres.ts      # Postgres (배포용, 선택)
 
 # 4. 개발 서버 실행
@@ -374,6 +374,76 @@ INSERT INTO metrics (tab, date, customer, category, value, unit, is_estimate, me
 ('vcm', 'Q2''24', 'Traditional Server', 'stacked_sensor',     6,   'Kwsm', 0, '{"application":"traditionalServer"}');
 ```
 
+#### VCM 연간 차트 데이터 (년도 기반, 2024-2030)
+
+차트에 표시되는 연간 데이터. 모든 차트는 2024-2030 고정 범위를 사용합니다.
+
+**1. Total Wafer 수요 월평균** (`category = 'totalWaferYearly'`)
+```sql
+-- customer='Total', value=total(월평균), metadata에 pw/epi/isEstimate
+INSERT INTO metrics (tab, date, customer, category, value, unit, metadata) VALUES
+('vcm', '2024', 'Total', 'totalWaferYearly', 800, 'K/M',
+ '{"pw":464,"epi":336,"isEstimate":false}');
+```
+
+**2. Application별 연간 수요** (`category = 'appYearlyDemand'`)
+```sql
+-- customer=app type key, value=기기판매량
+INSERT INTO metrics (tab, date, customer, category, value, unit, metadata) VALUES
+('vcm', '2024', 'traditionalServer', 'appYearlyDemand', 1380000, 'ea',
+ '{"isEstimate":false}');
+```
+customer 키: `traditionalServer`, `aiServer`, `smartphone`, `pcNotebook`, `electricVehicle`, `ioe`, `automotive`
+
+**3. Device別 연간 웨이퍼 수요** (`category = 'deviceStackedYearly'`)
+```sql
+-- customer='All', metadata에 디바이스별 수량
+INSERT INTO metrics (tab, date, customer, category, value, unit, metadata) VALUES
+('vcm', '2024', 'All', 'deviceStackedYearly', NULL, 'Kwsm',
+ '{"isEstimate":false,"dram":1450,"hbm":280,"nand":1620,"otherMemory":380,"logic":1450,"analog":590,"discrete":730,"sensor":360}');
+```
+
+**4. Application별 Device 분해** (`category = 'deviceStackedYearlyByApp'`)
+```sql
+-- customer=app type key, metadata에 디바이스별 수량
+INSERT INTO metrics (tab, date, customer, category, value, unit, metadata) VALUES
+('vcm', '2024', 'traditionalServer', 'deviceStackedYearlyByApp', NULL, 'Kwsm',
+ '{"isEstimate":false,"dram":285,"hbm":8,"nand":125,"otherMemory":22,"logic":58,"analog":16,"discrete":25,"sensor":7}');
+```
+
+**5. Application별 Wafer 수요** (`category = 'totalWaferDemandByAppYearly'`)
+```sql
+-- customer=app type key, value=연간 wafer 수요 총량
+INSERT INTO metrics (tab, date, customer, category, value, unit, metadata) VALUES
+('vcm', '2024', 'traditionalServer', 'totalWaferDemandByAppYearly', 3050, 'Kwsm',
+ '{"isEstimate":false}');
+```
+
+**6. 대당탑재량** (`category = 'yearlyMountPerUnitByCategory'`)
+```sql
+-- customer=app category, metadata에 serverType/label/value/unit
+INSERT INTO metrics (tab, date, customer, category, value, unit, metadata) VALUES
+('vcm', '2024', 'server', 'yearlyMountPerUnitByCategory', NULL, NULL,
+ '{"serverType":"traditional","label":"Trad. Server 대당탑재량(장)","value":1.15,"unit":"장/대"}');
+```
+customer 키: `server`, `smartphone`, `pc`, `automotive`, `industrial`
+
+#### Transcript 캐시 (`tab = 'transcript-cache'`)
+
+Earnings Transcript AI 요약을 DB에 캐시합니다. 배포 후에도 유지됩니다.
+
+```sql
+-- 자동으로 /api/transcript 호출 시 저장됨 (수동 입력 불필요)
+-- category='transcript_result', metadata에 전체 응답 JSON
+INSERT INTO metrics (tab, date, customer, category, value, unit, version, metadata) VALUES
+('transcript-cache', '2026-03-24', 'SEC', 'transcript_result', NULL, NULL, '4Q25',
+ '{"quarter":"4Q25","summary":"...","structured":{"sections":[...]},"sources":[...]}');
+```
+
+> Transcript 캐시는 `/api/transcript?customer=SEC` 호출 시 자동 저장됩니다.
+> 수동 재생성: `curl http://localhost:3000/api/transcript?customer=SEC`
+> 전체 재생성: file cache 삭제 후 모든 고객 호출
+
 ---
 
 ### 4-3. 고객별 탭 (`tab = 'customer-detail'`)
@@ -635,10 +705,10 @@ sqlite3 data/dashboard.db "DELETE FROM metrics WHERE tab='customer-detail' AND c
 ```bash
 # SQLite
 rm data/dashboard.db
-npm run seed                          # 18,092 rows
+npm run seed                          # 18,471 rows
 
 # Postgres (배포용)
-npx tsx scripts/seed-postgres.ts      # 18,092 rows
+npx tsx scripts/seed-postgres.ts      # 18,471 rows
 ```
 
 ### Q: Postgres를 사용 중인데 데이터가 안 바뀌어요
@@ -950,7 +1020,7 @@ npx tsx scripts/validate.ts
   데이터 적재 검증 결과
 ========================================
 
-  ✓ 전체 데이터: 총 18,092행
+  ✓ 전체 데이터: 총 18,471행
   ✓ 탭: supply-chain: 6,482행
   ✓ 탭: vcm: 1,179행
   ✓ 탭: customer-detail: 10,431행
