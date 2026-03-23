@@ -24,10 +24,17 @@ export default function WeeklySummary({ data, customerId, foundryData, mktInfo }
   const [lastModified, setLastModified] = useState<string | null>(null);
 
   // Load from localStorage on mount or customer change
+  // If mock data changed (data.comment differs from saved), reset to new data
   useEffect(() => {
     const saved = localStorage.getItem(getStorageKey(customerId));
     const savedTs = localStorage.getItem(getTimestampKey(customerId));
-    if (saved !== null) {
+    if (saved !== null && saved !== data.comment) {
+      // Mock data changed — clear stale localStorage
+      localStorage.removeItem(getStorageKey(customerId));
+      localStorage.removeItem(getTimestampKey(customerId));
+      setComment(data.comment);
+      setLastModified(null);
+    } else if (saved !== null) {
       setComment(saved);
       setLastModified(savedTs);
     } else {
@@ -49,7 +56,7 @@ export default function WeeklySummary({ data, customerId, foundryData, mktInfo }
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
-          {data.weekLabel} - 고객 회의록
+          {data.weekLabel} - 고객 회의록 및 Weekly
         </h3>
         <button
           onClick={() => {
@@ -88,10 +95,22 @@ export default function WeeklySummary({ data, customerId, foundryData, mktInfo }
           autoFocus
         />
       ) : (
-        <p className="flex gap-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
-          <span className="mt-0.5 text-gray-400">&#8226;</span>
-          <span>{comment}</span>
-        </p>
+        <div className="space-y-1.5">
+          {(comment || '').split('\n').filter(Boolean).map((line, i) => {
+            const dateMatch = line.match(/\[(\d{2}\.\d{2}\.\d{2})\]$/);
+            const text = dateMatch ? line.replace(dateMatch[0], '').trim() : line;
+            const date = dateMatch ? dateMatch[1] : null;
+            return (
+              <p key={i} className="flex gap-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                <span className="mt-0.5 shrink-0 text-gray-400">&#8226;</span>
+                <span>
+                  {text}
+                  {date && <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">{date}</span>}
+                </span>
+              </p>
+            );
+          })}
+        </div>
       )}
 
       {lastModified && (

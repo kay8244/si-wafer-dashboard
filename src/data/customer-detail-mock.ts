@@ -191,7 +191,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     ],
     weeklySummary: {
       weekLabel: 'Week 1, Mar 2026',
-      comment: '주요 판단: AI 투자심리 상단 조심 필요. HBM3E Qual 진행률 정상. DDR5 전환 가속 중. 6/7K → 700K 목표 유지.',
+      comment: '투입량 전월 대비 +2.1% 증가, CAPA 확장에 따른 가동률 소폭 하락(91→89%). 재고수준 2.3개월로 적정 범위 유지 [26.03.18]\nHBM3E Qual 진행률 정상, DDR5 전환 가속 중. AI 서버향 수요 견조하나 투자심리 상단 주의 필요 [26.03.10]\n구매량 전분기 대비 +5.3% 증가, 6/7K 목표 700K 유지. CAPA 증설 계획 Q3 반영 예정 [26.02.25]',
     },
   },
   SKHynix: {
@@ -241,7 +241,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     ],
     weeklySummary: {
       weekLabel: 'Week 1, Mar 2026',
-      comment: 'HBM3E 수율 업계 최고 수준 유지. AI 서버향 수요 강세. M15X 진행 정상. Wafer 공급 안정적.',
+      comment: '가동률 92%로 전월 대비 +1.5%p 상승, HBM3E 수율 업계 최고 수준 유지 [26.03.15]\n투입량 580K로 안정적, AI 서버향 수요 강세 지속. M15X Fab 증설 정상 진행 [26.03.08]\n재고수준 1.8개월로 타이트, 구매량 확대 검토 중. Wafer 공급 안정적 [26.02.22]',
     },
   },
   Micron: {
@@ -289,7 +289,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     ],
     weeklySummary: {
       weekLabel: 'Week 1, Mar 2026',
-      comment: 'HBM3E 납품 안정화. Fab 가동률 상승 중. DDR5 전환율 업계 평균 수준.',
+      comment: 'CAPA 대비 투입량 비율 88%로 가동률 회복세, HBM3E 납품 물량 안정화 [26.03.12]\nDDR5 전환율 업계 평균 수준, 구매량 전월 대비 소폭 감소(-1.2%) [26.03.05]\n재고수준 2.5개월로 소폭 상승, Fab 증설 완료 시점 Q2 말 예상 [26.02.20]',
     },
   },
   SEC_Foundry: {
@@ -338,7 +338,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     ],
     weeklySummary: {
       weekLabel: 'Week 1, Mar 2026',
-      comment: '3nm 수율 개선 중. 2nm GAA 개발 일정 정상. 가동률 회복세 지속.',
+      comment: '3nm 수율 개선으로 가동률 85%까지 회복, 투입량 전월 대비 +3.2% 증가 [26.03.14]\n2nm GAA 개발 일정 정상 진행, CAPA 증설은 Q4 반영 예정 [26.03.06]\n구매량 안정적 유지, 재고수준 1.5개월로 타이트한 상황 지속 [26.02.28]',
     },
     foundryData: '2nm GAA: 2025H2 리스크 생산 목표',
     mktInfo: 'Foundry 시장 2025 +12% 성장 전망 (TrendForce)',
@@ -389,7 +389,7 @@ export const CUSTOMER_EXECUTIVES: Record<CustomerDetailId, CustomerExecutive> = 
     ],
     weeklySummary: {
       weekLabel: 'Week 1, Mar 2026',
-      comment: '업계 최고 가동률 유지. AI칩 수요로 3nm/5nm 풀가동. CoWoS 캐파 지속 확장.',
+      comment: '업계 최고 가동률 96% 유지, AI칩 수요로 3nm/5nm 풀가동 상태 [26.03.17]\nCoWoS 캐파 지속 확장 중, 투입량 전분기 대비 +8% 증가 [26.03.09]\nCapa 대비 투입량 비율 최고 수준, 2nm 시험 생산 일정 순조 [26.02.24]',
     },
     foundryData: 'A16: 2026 양산, N2: 양산 중',
     mktInfo: 'Foundry 시장 점유율 62% (TrendForce)',

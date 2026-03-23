@@ -341,6 +341,35 @@ export interface DeviceStackedEntry {
   sensor: number;
 }
 
+// Yearly data for VCM charts (yearly basis)
+export interface YearlyValue {
+  year: number;
+  value: number;
+  isEstimate: boolean;
+}
+
+export interface TotalWaferYearlyEntry {
+  year: number;
+  total: number;
+  pw: number;
+  epi: number;
+  isEstimate: boolean;
+}
+
+export interface DeviceStackedYearlyEntry {
+  year: number;
+  isEstimate: boolean;
+  dram: number;
+  hbm: number;
+  nand: number;
+  otherMemory: number;
+  foundry?: number;
+  logic: number;
+  analog: number;
+  discrete: number;
+  sensor: number;
+}
+
 // --- Filter State ---
 
 export interface ApplicationFilterItem {

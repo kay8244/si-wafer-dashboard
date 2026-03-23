@@ -12,23 +12,16 @@ import {
   LabelList,
   ReferenceLine,
 } from 'recharts';
-import type { DeviceStackedEntry, DeviceFilterItem } from '@/types/indicators';
+import type { DeviceStackedYearlyEntry, DeviceFilterItem } from '@/types/indicators';
 import { useDarkMode } from '@/hooks/useDarkMode';
-import type { TimeRange } from './TotalWaferLineChart';
+const START_YEAR = 2024;
+const END_YEAR = 2030;
 
 interface DeviceStackedChartProps {
   title: string;
-  data: DeviceStackedEntry[];
+  data: DeviceStackedYearlyEntry[];
   deviceFilters?: DeviceFilterItem[];
-  timeRange: TimeRange;
-  onTimeRangeChange: (range: TimeRange) => void;
 }
-
-const TIME_PRESETS: { value: TimeRange; label: string }[] = [
-  { value: 4, label: '4Q' },
-  { value: 8, label: '8Q' },
-  { value: 12, label: '12Q' },
-];
 
 const DEVICE_COLORS: Record<string, string> = {
   dram: '#3b82f6',
@@ -64,21 +57,9 @@ function formatBarLabel(value: number): string {
   return String(value);
 }
 
-/** TimeRange value IS the number of quarters */
-
-function getYear(quarter: string): string {
-  const match = quarter.match(/'(\d{2})$/);
-  return match ? `20${match[1]}` : '';
-}
-
-function getQuarterLabel(quarter: string): string {
-  const match = quarter.match(/^Q(\d)/);
-  return match ? `${match[1]}Q` : quarter;
-}
-
-export default function DeviceStackedChart({ title, data, deviceFilters, timeRange, onTimeRangeChange }: DeviceStackedChartProps) {
+export default function DeviceStackedChart({ title, data, deviceFilters }: DeviceStackedChartProps) {
   const { isDark } = useDarkMode();
-  const [showQoQ, setShowQoQ] = useState(false);
+  const [showYoY, setShowYoY] = useState(false);
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
   const labelFill = isDark ? '#cbd5e1' : '#374151';
   const tooltipStyle = isDark
@@ -86,27 +67,22 @@ export default function DeviceStackedChart({ title, data, deviceFilters, timeRan
     : { fontSize: 13, borderRadius: 6 };
   const deviceKeys = ['dram', 'hbm', 'nand', 'otherMemory', 'logic', 'analog', 'discrete', 'sensor'] as const;
 
-  // Find current boundary (last non-estimate)
+  // Find current boundary — dynamically based on current year
+  const currentYear = new Date().getFullYear();
   const currentIdx = useMemo(() => {
     let idx = -1;
-    for (let i = data.length - 1; i >= 0; i--) {
-      if (!data[i].isEstimate) { idx = i; break; }
+    for (let i = 0; i < data.length; i++) {
+      if (data[i].year <= currentYear) idx = i;
     }
     return idx;
+  }, [data, currentYear]);
+
+  // Fixed range 2024-2030
+  const filteredData = useMemo(() => {
+    return data.filter((d) => d.year >= START_YEAR && d.year <= END_YEAR);
   }, [data]);
 
-  // Time-centered filtering
-  const filteredData = useMemo(() => {
-    const quarters = timeRange;
-    const half = Math.floor(quarters / 2);
-    const center = currentIdx >= 0 ? currentIdx : Math.floor(data.length / 2);
-    const start = Math.max(0, center - half);
-    const end = Math.min(data.length, start + quarters);
-    const adjustedStart = Math.max(0, end - quarters);
-    return data.slice(adjustedStart, end);
-  }, [data, timeRange, currentIdx]);
-
-  const boundaryQuarter = currentIdx >= 0 ? data[currentIdx]?.quarter : undefined;
+  const boundaryYear = currentIdx >= 0 ? data[currentIdx]?.year : undefined;
 
   const checkedTypes = deviceFilters
     ? new Set(deviceFilters.filter((f) => f.checked).map((f) => f.type))
@@ -122,42 +98,16 @@ export default function DeviceStackedChart({ title, data, deviceFilters, timeRan
     const totals = filteredData.map((entry) =>
       activeKeys.reduce((sum, key) => sum + (entry[key] ?? 0), 0),
     );
+    const minTotal = Math.min(...totals);
     const maxTotal = Math.max(...totals);
-    const top = Math.ceil((maxTotal * 1.15) / 100) * 100;
-    return [0, top];
+    const range = maxTotal - minTotal;
+    const ratio = range / maxTotal;
+    const bottom = ratio < 0.4
+      ? Math.max(0, Math.floor((minTotal * 0.85) / 500) * 500)
+      : 0;
+    const top = Math.ceil((maxTotal * 1.1) / 500) * 500;
+    return [bottom, top];
   }, [filteredData, activeKeys]);
-
-  // Year group labels
-  const yearLabels = useMemo(() => {
-    const labels: { year: string; startIdx: number; endIdx: number }[] = [];
-    let prevYear = '';
-    filteredData.forEach((d, i) => {
-      const yr = getYear(d.quarter);
-      if (yr !== prevYear) {
-        if (labels.length > 0) labels[labels.length - 1].endIdx = i - 1;
-        labels.push({ year: yr, startIdx: i, endIdx: i });
-        prevYear = yr;
-      } else if (labels.length > 0) {
-        labels[labels.length - 1].endIdx = i;
-      }
-    });
-    return labels;
-  }, [filteredData]);
-
-  // Year groups for table
-  const yearGroups = useMemo(() => {
-    const groups: { year: string; quarters: DeviceStackedEntry[] }[] = [];
-    filteredData.forEach((d) => {
-      const yr = getYear(d.quarter);
-      const last = groups[groups.length - 1];
-      if (last && last.year === yr) {
-        last.quarters.push(d);
-      } else {
-        groups.push({ year: yr, quarters: [d] });
-      }
-    });
-    return groups;
-  }, [filteredData]);
 
   return (
     <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
@@ -166,57 +116,23 @@ export default function DeviceStackedChart({ title, data, deviceFilters, timeRan
         <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">{title}</h3>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowQoQ((v) => !v)}
+            onClick={() => setShowYoY((v) => !v)}
             className={`rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors ${
-              showQoQ
+              showYoY
                 ? 'bg-orange-500 text-white shadow-sm'
                 : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
             }`}
           >
-            QoQ
+            YoY
           </button>
         </div>
-        <div className="flex items-center gap-1">
-          {TIME_PRESETS.map((preset) => (
-            <button
-              key={String(preset.value)}
-              onClick={() => onTimeRangeChange(preset.value)}
-              className={`rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors ${
-                timeRange === preset.value
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
-              }`}
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
       </div>
-
-      {/* Year group labels — ABOVE chart */}
-      {yearLabels.length > 1 && (
-        <div className="mb-1 flex" style={{ marginLeft: 50, marginRight: 8 }}>
-          {yearLabels.map((yl) => {
-            const span = yl.endIdx - yl.startIdx + 1;
-            const widthPct = (span / filteredData.length) * 100;
-            return (
-              <div
-                key={yl.year}
-                className="text-center text-sm font-bold text-gray-500 dark:text-gray-400"
-                style={{ width: `${widthPct}%` }}
-              >
-                {yl.year}
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       <div style={{ height: 200 }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={filteredData} margin={{ top: 20, right: 8, left: 8, bottom: 4 }}>
             <XAxis
-              dataKey="quarter"
+              dataKey="year"
               tick={{ fontSize: 11, fill: tickFill }}
               axisLine={false}
               tickLine={false}
@@ -234,15 +150,16 @@ export default function DeviceStackedChart({ title, data, deviceFilters, timeRan
                 `${Number(value).toLocaleString()} K/M`,
                 DEVICE_LABELS[name ?? ''] ?? name,
               ]}
+              labelFormatter={(label) => `${label}년`}
               contentStyle={tooltipStyle}
             />
             <Legend
               wrapperStyle={{ fontSize: 11 }}
               formatter={(value: string) => DEVICE_LABELS[value] ?? value}
             />
-            {boundaryQuarter && filteredData.some((d) => d.quarter === boundaryQuarter) && (
+            {boundaryYear && filteredData.some((d) => d.year === boundaryYear) && (
               <ReferenceLine
-                x={boundaryQuarter}
+                x={boundaryYear}
                 stroke={isDark ? '#fbbf24' : '#dc2626'}
                 strokeDasharray="4 4"
                 strokeWidth={1.5}
@@ -317,37 +234,23 @@ export default function DeviceStackedChart({ title, data, deviceFilters, timeRan
         </ResponsiveContainer>
       </div>
 
-      {/* Data table — year-merged header */}
+      {/* Data table — yearly */}
       {filteredData.length > 0 && activeKeys.length > 0 && (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-gray-100 dark:bg-gray-700">
-                <th
-                  rowSpan={2}
-                  className="text-left px-2 py-1 border border-gray-200 font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-300 whitespace-nowrap align-middle"
-                >
+                <th className="text-left px-2 py-1 border border-gray-200 font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-300 whitespace-nowrap">
                   구분
                 </th>
-                {yearGroups.map((g) => (
-                  <th
-                    key={g.year}
-                    colSpan={g.quarters.length}
-                    className="text-center px-1 py-1 border border-gray-200 font-bold text-gray-700 dark:border-gray-600 dark:text-gray-200 whitespace-nowrap"
-                  >
-                    {g.year}
-                  </th>
-                ))}
-              </tr>
-              <tr className="bg-gray-50 dark:bg-gray-600">
                 {filteredData.map((d) => (
                   <th
-                    key={d.quarter}
-                    className={`text-center px-1.5 py-1 border border-gray-200 font-semibold whitespace-nowrap dark:border-gray-600 ${
-                      d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-600 dark:text-gray-300'
+                    key={d.year}
+                    className={`text-center px-1.5 py-1 border border-gray-200 font-bold whitespace-nowrap dark:border-gray-600 ${
+                      d.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'
                     }`}
                   >
-                    {getQuarterLabel(d.quarter)}
+                    {d.year}
                   </th>
                 ))}
               </tr>
@@ -361,27 +264,27 @@ export default function DeviceStackedChart({ title, data, deviceFilters, timeRan
                     </td>
                     {filteredData.map((d) => (
                       <td
-                        key={d.quarter}
+                        key={d.year}
                         className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
-                          d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
+                          d.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'
                         }`}
                       >
                         {(d[key] ?? 0).toLocaleString()}
                       </td>
                     ))}
                   </tr>
-                  {showQoQ && (
+                  {showYoY && (
                     <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] whitespace-nowrap dark:border-gray-600" style={{ color: DEVICE_COLORS[key], opacity: 0.6 }}>QoQ</td>
+                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] whitespace-nowrap dark:border-gray-600" style={{ color: DEVICE_COLORS[key], opacity: 0.6 }}>YoY</td>
                       {filteredData.map((d, i) => {
                         const cur = d[key] ?? 0;
                         const prev = i > 0 ? (filteredData[i - 1][key] ?? 0) : null;
-                        const qoq = prev && prev > 0 ? ((cur - prev) / prev) * 100 : null;
-                        const sign = qoq !== null && qoq > 0 ? '+' : '';
-                        const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                        const yoy = prev && prev > 0 ? ((cur - prev) / prev) * 100 : null;
+                        const sign = yoy !== null && yoy > 0 ? '+' : '';
+                        const color = yoy === null ? 'text-gray-300 dark:text-gray-600' : yoy > 0 ? 'text-red-500' : yoy < 0 ? 'text-blue-500' : 'text-gray-400';
                         return (
-                          <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
-                            {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                          <td key={d.year} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                            {yoy !== null ? `${sign}${yoy.toFixed(1)}%` : '-'}
                           </td>
                         );
                       })}
@@ -398,9 +301,9 @@ export default function DeviceStackedChart({ title, data, deviceFilters, timeRan
                   const total = activeKeys.reduce((sum, key) => sum + (d[key] ?? 0), 0);
                   return (
                     <td
-                      key={d.quarter}
+                      key={d.year}
                       className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
-                        d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-200'
+                        d.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'
                       }`}
                     >
                       {total.toLocaleString()}
@@ -408,45 +311,24 @@ export default function DeviceStackedChart({ title, data, deviceFilters, timeRan
                   );
                 })}
               </tr>
-              {/* Total QoQ */}
-              {showQoQ && (
+              {/* Total YoY */}
+              {showYoY && (
                 <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">YoY</td>
                   {filteredData.map((d, i) => {
                     const total = activeKeys.reduce((sum, key) => sum + (d[key] ?? 0), 0);
                     const prevTotal = i > 0 ? activeKeys.reduce((sum, key) => sum + (filteredData[i - 1][key] ?? 0), 0) : null;
-                    const qoq = prevTotal && prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : null;
-                    const sign = qoq !== null && qoq > 0 ? '+' : '';
-                    const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                    const yoy = prevTotal && prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : null;
+                    const sign = yoy !== null && yoy > 0 ? '+' : '';
+                    const color = yoy === null ? 'text-gray-300 dark:text-gray-600' : yoy > 0 ? 'text-red-500' : yoy < 0 ? 'text-blue-500' : 'text-gray-400';
                     return (
-                      <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
-                        {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                      <td key={d.year} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                        {yoy !== null ? `${sign}${yoy.toFixed(1)}%` : '-'}
                       </td>
                     );
                   })}
                 </tr>
               )}
-              {/* CAGR row (12Q only) */}
-              {timeRange === 12 && (() => {
-                const first = filteredData[0];
-                const last = filteredData[filteredData.length - 1];
-                const years = (filteredData.length - 1) / 4;
-                if (!first || !last || years <= 0) return null;
-                const firstTotal = activeKeys.reduce((sum, key) => sum + (first[key] ?? 0), 0);
-                const lastTotal = activeKeys.reduce((sum, key) => sum + (last[key] ?? 0), 0);
-                const cagr = firstTotal > 0 && lastTotal > 0 ? (Math.pow(lastTotal / firstTotal, 1 / years) - 1) * 100 : null;
-                return (
-                  <tr className="bg-blue-50/50 dark:bg-blue-900/20">
-                    <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
-                    <td
-                      colSpan={filteredData.length}
-                      className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400"
-                    >
-                      {cagr !== null ? `${cagr > 0 ? '+' : ''}${cagr.toFixed(1)}%` : '-'}
-                    </td>
-                  </tr>
-                );
-              })()}
             </tbody>
           </table>
         </div>

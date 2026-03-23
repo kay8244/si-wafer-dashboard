@@ -131,35 +131,6 @@ export default function ExecutivePanel({ data }: Props) {
         )}
       </div>
 
-      {/* Product Mix compact row with MoM change */}
-      <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 dark:border-gray-600 dark:bg-gray-700/50">
-        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Product Mix:</span>
-        {data.productMix.map((item, idx) => {
-          // Calculate QoQ change from productMixTrend
-          const trend = data.productMixTrend;
-          let change: number | null = null;
-          if (trend && trend.length >= 2) {
-            const latest = trend[trend.length - 1].values[item.category];
-            const prev = trend[trend.length - 2].values[item.category];
-            if (latest !== undefined && prev !== undefined) {
-              change = latest - prev;
-            }
-          }
-          return (
-            <span key={item.category} className="text-sm font-medium" style={{ color: item.color }}>
-              {item.category} ({item.percentage}%)
-              {change !== null && change !== 0 && (
-                <span className="ml-0.5 text-[10px] font-semibold" style={{ color: item.color }}>
-                  전월대비 {change > 0 ? `+${change}` : change}pp
-                </span>
-              )}
-              {idx < data.productMix.length - 1 && (
-                <span className="ml-1.5 text-gray-300 dark:text-gray-600">/</span>
-              )}
-            </span>
-          );
-        })}
-      </div>
 
       {/* KPI Cards — Title → Number → MoM */}
       <div className="grid grid-cols-3 gap-2">

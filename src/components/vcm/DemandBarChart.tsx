@@ -12,23 +12,21 @@ import {
   Cell,
   LabelList,
   ReferenceLine,
-  Legend,
 } from 'recharts';
 import { useDarkMode } from '@/hooks/useDarkMode';
-import type { TimeRange } from './TotalWaferLineChart';
-import type { QuarterlyValue } from '@/types/indicators';
+import type { YearlyValue } from '@/types/indicators';
 
 interface DataPoint {
-  quarter: string;
+  year: number;
   value: number;
   isEstimate: boolean;
 }
 
 export interface MountDataItem {
   label: string;
-  data: QuarterlyValue[];
+  data: YearlyValue[];
   color: string;
-  group?: 'primary' | 'secondary';
+  group?: 'wafer' | 'primary' | 'secondary';
 }
 
 interface DemandBarChartProps {
@@ -39,18 +37,11 @@ interface DemandBarChartProps {
   secondaryData?: DataPoint[];
   secondaryLabel?: string;
   secondaryColor?: string;
-  lineData?: QuarterlyValue[];
-  lineColor?: string;
-  timeRange: TimeRange;
-  onTimeRangeChange: (range: TimeRange) => void;
   mountData?: MountDataItem[];
 }
 
-const TIME_PRESETS: { value: TimeRange; label: string }[] = [
-  { value: 4, label: '4Q' },
-  { value: 8, label: '8Q' },
-  { value: 12, label: '12Q' },
-];
+const START_YEAR = 2024;
+const END_YEAR = 2030;
 
 function formatYAxis(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
@@ -70,21 +61,6 @@ function formatTableValue(value: number): string {
   return String(value);
 }
 
-function formatLineValue(value: number): string {
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-  return value.toFixed(1);
-}
-
-function getYear(quarter: string): string {
-  const match = quarter.match(/'(\d{2})$/);
-  return match ? `20${match[1]}` : '';
-}
-
-function getQuarterLabel(quarter: string): string {
-  const match = quarter.match(/^Q(\d)/);
-  return match ? `${match[1]}Q` : quarter;
-}
-
 export default function DemandBarChart({
   title,
   data,
@@ -93,14 +69,10 @@ export default function DemandBarChart({
   secondaryData,
   secondaryLabel,
   secondaryColor = '#8b5cf6',
-  lineData,
-  lineColor = '#f97316',
-  timeRange,
-  onTimeRangeChange,
   mountData,
 }: DemandBarChartProps) {
   const { isDark } = useDarkMode();
-  const [showQoQ, setShowQoQ] = useState(false);
+  const [showYoY, setShowYoY] = useState(false);
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
   const labelFill = isDark ? '#cbd5e1' : '#374151';
   const tooltipStyle = isDark
@@ -108,60 +80,77 @@ export default function DemandBarChart({
     : { fontSize: 13, borderRadius: 6 };
 
   const hasDualBars = !!secondaryData && secondaryData.length > 0;
-  const hasLine = !!lineData && lineData.length > 0;
 
-  // Find current boundary (last non-estimate)
+  // Find current boundary — dynamically based on current year
+  const currentYear = new Date().getFullYear();
   const currentIdx = useMemo(() => {
     let idx = -1;
-    for (let i = data.length - 1; i >= 0; i--) {
-      if (!data[i].isEstimate) { idx = i; break; }
+    for (let i = 0; i < data.length; i++) {
+      if (data[i].year <= currentYear) idx = i;
     }
     return idx;
+  }, [data, currentYear]);
+
+  // Fixed range 2024-2030
+  const filteredData = useMemo(() => {
+    return data.filter((d) => d.year >= START_YEAR && d.year <= END_YEAR);
   }, [data]);
 
-  // Time-centered filtering
-  const filteredData = useMemo(() => {
-    const quarters = timeRange;
-    const half = Math.floor(quarters / 2);
-    const center = currentIdx >= 0 ? currentIdx : Math.floor(data.length / 2);
-    const start = Math.max(0, center - half);
-    const end = Math.min(data.length, start + quarters);
-    const adjustedStart = Math.max(0, end - quarters);
-    return data.slice(adjustedStart, end);
-  }, [data, timeRange, currentIdx]);
-
-  // Secondary data aligned to same quarters
+  // Secondary data aligned to same years
   const filteredSecondary = useMemo(() => {
     if (!hasDualBars || !secondaryData) return undefined;
     return filteredData.map((d) => {
-      const match = secondaryData.find((s) => s.quarter === d.quarter);
-      return match ?? { quarter: d.quarter, value: 0, isEstimate: d.isEstimate };
+      const match = secondaryData.find((s) => s.year === d.year);
+      return match ?? { year: d.year, value: 0, isEstimate: d.isEstimate };
     });
   }, [secondaryData, hasDualBars, filteredData]);
 
-  // Line data aligned to same quarters
-  const filteredLine = useMemo(() => {
-    if (!hasLine || !lineData) return undefined;
-    return filteredData.map((d) => {
-      const match = lineData.find((l) => l.quarter === d.quarter);
-      return match ?? { quarter: d.quarter, value: 0, isEstimate: d.isEstimate };
-    });
-  }, [lineData, hasLine, filteredData]);
+  const boundaryYear = currentIdx >= 0 ? data[currentIdx]?.year : undefined;
 
-  const boundaryQuarter = currentIdx >= 0 ? data[currentIdx]?.quarter : undefined;
+  // Mount table data (declared early so chartData can reference waferRows)
+  const waferRows = useMemo(() => mountData?.filter((m) => m.group === 'wafer') ?? [], [mountData]);
 
-  // Combined chart data for Recharts
+  // Combined chart data for Recharts (includes waferDemand for right axis line)
   const chartData = useMemo(() => {
-    return filteredData.map((d, i) => ({
-      quarter: d.quarter,
-      isEstimate: d.isEstimate,
-      primary: d.value,
-      ...(filteredSecondary ? { secondary: filteredSecondary[i]?.value ?? 0 } : {}),
-      ...(filteredLine ? { waferLine: filteredLine[i]?.value ?? null } : {}),
-    }));
-  }, [filteredData, filteredSecondary, filteredLine]);
+    return filteredData.map((d, i) => {
+      const waferEntry = waferRows[0]?.data.find((v) => v.year === d.year);
+      return {
+        year: d.year,
+        isEstimate: d.isEstimate,
+        primary: d.value,
+        ...(filteredSecondary ? { secondary: filteredSecondary[i]?.value ?? 0 } : {}),
+        ...(waferEntry != null ? { waferDemand: waferEntry.value } : {}),
+      };
+    });
+  }, [filteredData, filteredSecondary, waferRows]);
 
-  // Left Y-axis domain (bar data — device sales)
+  // Right Y-axis domain for wafer demand line
+  const hasWaferLine = waferRows.length > 0;
+
+  // CAGR for wafer demand line
+  const waferCagr = useMemo(() => {
+    if (!hasWaferLine) return null;
+    const wd = waferRows[0].data.filter((v) => v.year >= 2024 && v.year <= 2030);
+    if (wd.length < 2) return null;
+    const first = wd[0].value;
+    const last = wd[wd.length - 1].value;
+    const years = wd.length - 1;
+    if (first <= 0 || last <= 0) return null;
+    return (Math.pow(last / first, 1 / years) - 1) * 100;
+  }, [hasWaferLine, waferRows]);
+  const waferYDomain = useMemo(() => {
+    if (!hasWaferLine) return [0, 100];
+    const values = waferRows[0].data
+      .filter((v) => v.year >= 2024 && v.year <= 2030)
+      .map((v) => v.value);
+    if (values.length === 0) return [0, 100];
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const padding = (max - min) * 0.2;
+    return [Math.max(0, Math.floor(min - padding)), Math.ceil(max + padding)];
+  }, [hasWaferLine, waferRows]);
+
+  // Y-axis domain
   const yDomain = useMemo(() => {
     if (chartData.length === 0) return [0, 100];
     const values = chartData.flatMap((d) => {
@@ -171,59 +160,18 @@ export default function DemandBarChart({
     });
     const min = Math.min(...values);
     const max = Math.max(...values);
-    const padding = (max - min) * 0.15;
-    const bottom = Math.max(0, Math.floor((min - padding) / 1000) * 1000);
-    const top = Math.ceil((max + padding) / 1000) * 1000;
+    const range = max - min;
+    const padding = range * 0.15;
+    // If range is small relative to values, zoom in (don't start from 0)
+    const ratio = range / max;
+    const bottom = ratio < 0.5
+      ? Math.max(0, Math.floor((min - padding) / (max > 100000 ? 100000 : max > 10000 ? 10000 : 1000)) * (max > 100000 ? 100000 : max > 10000 ? 10000 : 1000))
+      : 0;
+    const top = Math.ceil((max + padding) / (max > 100000 ? 100000 : max > 10000 ? 10000 : 1000)) * (max > 100000 ? 100000 : max > 10000 ? 10000 : 1000);
     return [bottom, top];
   }, [chartData]);
 
-  // Right Y-axis domain (wafer line)
-  const yDomainRight = useMemo(() => {
-    if (!filteredLine || filteredLine.length === 0) return [0, 100];
-    const values = filteredLine.map((d) => d.value);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const padding = (max - min) * 0.2;
-    const bottom = Math.max(0, Math.floor((min - padding) / 10) * 10);
-    const top = Math.ceil((max + padding) / 10) * 10;
-    return [bottom, top];
-  }, [filteredLine]);
-
-  // Year labels above chart
-  const yearLabels = useMemo(() => {
-    const labels: { year: string; startIdx: number; endIdx: number }[] = [];
-    let prevYear = '';
-    filteredData.forEach((d, i) => {
-      const yr = getYear(d.quarter);
-      if (yr !== prevYear) {
-        if (labels.length > 0) labels[labels.length - 1].endIdx = i - 1;
-        labels.push({ year: yr, startIdx: i, endIdx: i });
-        prevYear = yr;
-      } else if (labels.length > 0) {
-        labels[labels.length - 1].endIdx = i;
-      }
-    });
-    return labels;
-  }, [filteredData]);
-
-  // Year groups for table
-  const yearGroups = useMemo(() => {
-    const groups: { year: string; quarters: DataPoint[] }[] = [];
-    filteredData.forEach((d) => {
-      const yr = getYear(d.quarter);
-      const last = groups[groups.length - 1];
-      if (last && last.year === yr) {
-        last.quarters.push(d);
-      } else {
-        groups.push({ year: yr, quarters: [d] });
-      }
-    });
-    return groups;
-  }, [filteredData]);
-
-  // Wafer demand rows from mountData (group === 'wafer') or the wafer line data
-  // Table row order: Wafer수요(월평균) → 기기판매량 → 대당탑재량
-  const waferRows = useMemo(() => mountData?.filter((m) => m.group === ('wafer' as string)) ?? [], [mountData]);
+  // Mount table data (remaining rows — waferRows declared earlier)
   const primaryMountRows = useMemo(() => mountData?.filter((m) => m.group === 'primary') ?? [], [mountData]);
   const secondaryMountRows = useMemo(() => mountData?.filter((m) => m.group === 'secondary') ?? [], [mountData]);
   const ungroupedRows = useMemo(() => mountData?.filter((m) => !m.group) ?? [], [mountData]);
@@ -235,51 +183,17 @@ export default function DemandBarChart({
         <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">{title}</h3>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowQoQ((v) => !v)}
+            onClick={() => setShowYoY((v) => !v)}
             className={`rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors ${
-              showQoQ
+              showYoY
                 ? 'bg-orange-500 text-white shadow-sm'
                 : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
             }`}
           >
-            QoQ
+            YoY
           </button>
         </div>
-        <div className="flex items-center gap-1">
-          {TIME_PRESETS.map((preset) => (
-            <button
-              key={String(preset.value)}
-              onClick={() => onTimeRangeChange(preset.value)}
-              className={`rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors ${
-                timeRange === preset.value
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
-              }`}
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
       </div>
-
-      {/* Year group labels */}
-      {yearLabels.length > 1 && (
-        <div className="mb-1 flex" style={{ marginLeft: 50, marginRight: hasLine ? 50 : 8 }}>
-          {yearLabels.map((yl) => {
-            const span = yl.endIdx - yl.startIdx + 1;
-            const widthPct = (span / filteredData.length) * 100;
-            return (
-              <div
-                key={yl.year}
-                className="text-center text-sm font-bold text-gray-500 dark:text-gray-400"
-                style={{ width: `${widthPct}%` }}
-              >
-                {yl.year}
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {/* Legend */}
       <div className="mb-1 flex items-center justify-center gap-4 text-[11px]">
@@ -300,24 +214,27 @@ export default function DemandBarChart({
             <span className="text-gray-600 dark:text-gray-400">{barLabel ?? '기기판매량(ea)'}</span>
           </span>
         )}
-        {hasLine && (
+        {hasWaferLine && (
           <span className="flex items-center gap-1">
-            <span className="inline-block h-0.5 w-4" style={{ backgroundColor: lineColor }} />
+            <svg width="16" height="10" className="shrink-0">
+              <line x1="0" y1="5" x2="16" y2="5" stroke="#111827" strokeWidth="2" />
+              <circle cx="8" cy="5" r="2.5" fill="#111827" />
+            </svg>
             <span className="text-gray-600 dark:text-gray-400">Wafer 수요 (월평균)</span>
           </span>
         )}
       </div>
 
       <div className="flex items-center justify-between px-1 mb-0.5">
-        <span className="text-[8px] text-gray-400 dark:text-gray-500">기기판매량(ea)</span>
-        {hasLine && <span className="text-[8px]" style={{ color: lineColor }}>Wafer수요(K/M)</span>}
+        <span className="text-[8px] text-gray-700 dark:text-gray-300 font-medium">기기판매량(ea)</span>
+        {hasWaferLine && <span className="text-[8px] text-gray-700 dark:text-gray-300 font-medium">Wafer 수요(K장)</span>}
       </div>
-      <div style={{ height: 240 }}>
+      <div style={{ height: 320 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartData} margin={{ top: 20, right: hasLine ? 24 : 8, left: 12, bottom: 4 }}>
+          <ComposedChart data={chartData} margin={{ top: 20, right: 8, left: 0, bottom: 4 }}>
             <XAxis
-              dataKey="quarter"
-              tick={{ fontSize: 11, fill: tickFill }}
+              dataKey="year"
+              tick={{ fontSize: 11, fill: isDark ? '#e2e8f0' : '#1f2937' }}
               axisLine={false}
               tickLine={false}
             />
@@ -325,35 +242,36 @@ export default function DemandBarChart({
               yAxisId="left"
               domain={yDomain}
               tickFormatter={formatYAxis}
-              tick={{ fontSize: 11, fill: tickFill }}
+              tick={{ fontSize: 11, fill: isDark ? '#e2e8f0' : '#1f2937' }}
               axisLine={false}
               tickLine={false}
               width={42}
             />
-            {hasLine && (
+            {hasWaferLine && (
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                domain={yDomainRight}
-                tickFormatter={formatLineValue}
-                tick={{ fontSize: 10, fill: lineColor }}
+                domain={waferYDomain}
+                tickFormatter={formatYAxis}
+                tick={{ fontSize: 11, fill: isDark ? '#e2e8f0' : '#1f2937' }}
                 axisLine={false}
                 tickLine={false}
-                width={44}
+                width={50}
               />
             )}
             <Tooltip
               formatter={(value, name) => {
-                if (name === 'waferLine') return [formatLineValue(Number(value)), 'Wafer 수요 (월평균)'];
+                if (name === 'waferDemand') return [formatTableValue(Number(value)) + '장', 'Wafer 수요 (월평균)'];
                 if (name === 'secondary') return [Number(value).toLocaleString(), secondaryLabel ?? 'Secondary'];
                 return [Number(value).toLocaleString(), barLabel ?? '기기판매량'];
               }}
+              labelFormatter={(label) => `${label}년`}
               contentStyle={tooltipStyle}
             />
-            {boundaryQuarter && filteredData.some((d) => d.quarter === boundaryQuarter) && (
+            {boundaryYear && filteredData.some((d) => d.year === boundaryYear) && (
               <ReferenceLine
                 yAxisId="left"
-                x={boundaryQuarter}
+                x={boundaryYear}
                 stroke={isDark ? '#fbbf24' : '#dc2626'}
                 strokeDasharray="4 4"
                 strokeWidth={1.5}
@@ -418,14 +336,14 @@ export default function DemandBarChart({
                 ))}
               </Bar>
             )}
-            {hasLine && (
+            {hasWaferLine && (
               <Line
                 yAxisId="right"
                 type="monotone"
-                dataKey="waferLine"
-                stroke={lineColor}
+                dataKey="waferDemand"
+                stroke="#111827"
                 strokeWidth={2}
-                dot={{ r: 3, fill: lineColor, strokeWidth: 0 }}
+                dot={{ r: 3, fill: '#111827', strokeWidth: 0 }}
                 activeDot={{ r: 5 }}
                 connectNulls
               />
@@ -434,37 +352,23 @@ export default function DemandBarChart({
         </ResponsiveContainer>
       </div>
 
-      {/* Data table — year-merged header + rows */}
+      {/* Data table — yearly */}
       {filteredData.length > 0 && (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-gray-100 dark:bg-gray-700">
-                <th
-                  rowSpan={2}
-                  className="text-left px-2 py-1 border border-gray-200 font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-300 whitespace-nowrap align-middle"
-                >
+                <th className="text-left px-2 py-1 border border-gray-200 font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-300 whitespace-nowrap">
                   구분
                 </th>
-                {yearGroups.map((g) => (
-                  <th
-                    key={g.year}
-                    colSpan={g.quarters.length}
-                    className="text-center px-1 py-1 border border-gray-200 font-bold text-gray-700 dark:border-gray-600 dark:text-gray-200 whitespace-nowrap"
-                  >
-                    {g.year}
-                  </th>
-                ))}
-              </tr>
-              <tr className="bg-gray-50 dark:bg-gray-600">
                 {filteredData.map((d) => (
                   <th
-                    key={d.quarter}
-                    className={`text-center px-1.5 py-1 border border-gray-200 font-semibold whitespace-nowrap dark:border-gray-600 ${
-                      d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-600 dark:text-gray-300'
+                    key={d.year}
+                    className={`text-center px-1.5 py-1 border border-gray-200 font-bold whitespace-nowrap dark:border-gray-600 ${
+                      d.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'
                     }`}
                   >
-                    {getQuarterLabel(d.quarter)}
+                    {d.year}
                   </th>
                 ))}
               </tr>
@@ -473,204 +377,126 @@ export default function DemandBarChart({
               {/* ── SERVER / AUTOMOTIVE dual-bar section ── */}
               {hasDualBars ? (
                 <>
-                  {/* Combined Wafer 수요 (월평균) row — from waferRows (group='wafer') */}
+                  {/* Combined Wafer 수요 row */}
                   {waferRows.map((mount) => (
                     <tr key={mount.label} className="bg-gray-100 dark:bg-gray-600">
                       <td className="px-2 py-1.5 border border-gray-200 font-bold whitespace-nowrap dark:border-gray-600 text-xs" style={{ color: '#111827' }}>
                         {mount.label}
                       </td>
                       {filteredData.map((d) => {
-                        const mv = mount.data.find((v) => v.quarter === d.quarter);
+                        const mv = mount.data.find((v) => v.year === d.year);
                         return (
-                          <td key={d.quarter} className={`px-1.5 py-1.5 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-xs font-bold ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}>
-                            {mv ? formatLineValue(mv.value) : '-'}
+                          <td key={d.year} className={`px-1.5 py-1.5 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-xs font-bold ${mv?.isEstimate ? 'text-gray-700 dark:text-gray-200' : 'text-gray-900 dark:text-gray-100'}`}>
+                            {mv ? formatTableValue(mv.value) : '-'}
                           </td>
                         );
                       })}
                     </tr>
                   ))}
-                  {/* Wafer 수요 QoQ */}
-                  {showQoQ && waferRows.map((mount) => (
-                    <tr key={`${mount.label}-qoq`} className="bg-gray-50/50 dark:bg-gray-700/30">
-                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                  {/* Wafer YoY */}
+                  {showYoY && waferRows.map((mount) => (
+                    <tr key={`${mount.label}-yoy`} className="bg-gray-50/50 dark:bg-gray-700/30">
+                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] whitespace-nowrap dark:border-gray-600" style={{ color: '#111827', opacity: 0.6 }}>YoY</td>
                       {filteredData.map((d, i) => {
-                        const curr = mount.data.find((v) => v.quarter === d.quarter)?.value ?? 0;
-                        const prevQ = i > 0 ? (mount.data.find((v) => v.quarter === filteredData[i - 1].quarter)?.value ?? 0) : 0;
-                        const qoq = i > 0 && prevQ > 0 ? ((curr - prevQ) / prevQ) * 100 : null;
-                        const sign = qoq !== null && qoq > 0 ? '+' : '';
-                        const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-blue-500' : qoq < 0 ? 'text-red-500' : 'text-gray-400';
+                        const cur = mount.data.find((v) => v.year === d.year);
+                        const prev = i > 0 ? mount.data.find((v) => v.year === filteredData[i - 1].year) : null;
+                        const yoy = cur && prev && prev.value > 0 ? ((cur.value - prev.value) / prev.value) * 100 : null;
+                        const sign = yoy !== null && yoy > 0 ? '+' : '';
+                        const color = yoy === null ? 'text-gray-300 dark:text-gray-600' : yoy > 0 ? 'text-red-500' : yoy < 0 ? 'text-blue-500' : 'text-gray-400';
                         return (
-                          <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
-                            {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                          <td key={d.year} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                            {yoy !== null ? `${sign}${yoy.toFixed(1)}%` : '-'}
                           </td>
                         );
                       })}
                     </tr>
                   ))}
-
-                  {/* PRIMARY GROUP: 기기판매량 → 대당탑재량 */}
-
-                  {/* Primary Wafer rows from mountData (legacy subgroup='wafer' fallback) */}
-                  {primaryMountRows.filter((m) => (m as MountDataItem & { subgroup?: string }).subgroup === 'wafer').map((mount) => (
-                    <tr key={mount.label} className="bg-orange-50/40 dark:bg-orange-900/10">
-                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: lineColor }}>
-                        {mount.label}
-                      </td>
-                      {filteredData.map((d) => {
-                        const mv = mount.data.find((v) => v.quarter === d.quarter);
-                        return (
-                          <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
-                            {mv ? formatLineValue(mv.value) : '-'}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-
-                  {/* Primary demand (기기판매량) */}
+                  {/* Primary bar data row */}
                   <tr className="bg-white dark:bg-gray-800">
                     <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: barColor }}>
-                      {barLabel ?? '기기판매량(ea)'}
+                      {barLabel ?? '기기판매량'}
                     </td>
                     {filteredData.map((d) => (
-                      <td
-                        key={d.quarter}
-                        className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
-                          d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
-                        }`}
-                      >
+                      <td key={d.year} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'}`}>
                         {formatTableValue(d.value)}
                       </td>
                     ))}
                   </tr>
-                  {showQoQ && (
+                  {/* Primary YoY */}
+                  {showYoY && (
                     <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] whitespace-nowrap dark:border-gray-600" style={{ color: barColor, opacity: 0.6 }}>YoY</td>
                       {filteredData.map((d, i) => {
                         const prev = i > 0 ? filteredData[i - 1].value : null;
-                        const qoq = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
-                        const sign = qoq !== null && qoq > 0 ? '+' : '';
-                        const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                        const yoy = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
+                        const sign = yoy !== null && yoy > 0 ? '+' : '';
+                        const color = yoy === null ? 'text-gray-300 dark:text-gray-600' : yoy > 0 ? 'text-red-500' : yoy < 0 ? 'text-blue-500' : 'text-gray-400';
                         return (
-                          <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
-                            {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                          <td key={d.year} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                            {yoy !== null ? `${sign}${yoy.toFixed(1)}%` : '-'}
                           </td>
                         );
                       })}
                     </tr>
                   )}
-                  {timeRange === 12 && (() => {
-                    const vals = filteredData.map((d) => d.value);
-                    const first = vals[0];
-                    const last = vals[vals.length - 1];
-                    const years = (filteredData.length - 1) / 4;
-                    const cagr = first > 0 && last > 0 && years > 0 ? (Math.pow(last / first, 1 / years) - 1) * 100 : null;
-                    return (
-                      <tr className="bg-blue-50/50 dark:bg-blue-900/20">
-                        <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
-                        <td colSpan={filteredData.length} className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400">
-                          {cagr !== null ? `${cagr > 0 ? '+' : ''}${cagr.toFixed(1)}%` : '-'}
-                        </td>
-                      </tr>
-                    );
-                  })()}
-
-                  {/* Primary 대당탑재량 */}
-                  {primaryMountRows.filter((m) => !(m as MountDataItem & { subgroup?: string }).subgroup).map((mount) => (
-                    <tr key={mount.label} className="bg-gray-50 dark:bg-gray-700">
-                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: mount.color }}>
+                  {/* Primary mount per unit — right after primary bar */}
+                  {primaryMountRows.map((mount) => (
+                    <tr key={mount.label} className="bg-white dark:bg-gray-800">
+                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[11px]" style={{ color: mount.color }}>
                         {mount.label}
                       </td>
                       {filteredData.map((d) => {
-                        const mv = mount.data.find((v) => v.quarter === d.quarter);
+                        const mv = mount.data.find((v) => v.year === d.year);
                         return (
-                          <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
-                            {mv ? (mv.value >= 1 ? mv.value.toFixed(2) : mv.value.toFixed(3)) : '-'}
+                          <td key={d.year} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[11px] ${mv?.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'}`}>
+                            {mv ? mv.value.toFixed(2) : '-'}
                           </td>
                         );
                       })}
                     </tr>
                   ))}
-
-                  {/* SECONDARY GROUP: Wafer수요(월평균) → 기기판매량 → 대당탑재량 */}
-
-                  {/* Secondary Wafer rows */}
-                  {secondaryMountRows.filter((m) => (m as MountDataItem & { subgroup?: string }).subgroup === 'wafer').map((mount) => (
-                    <tr key={mount.label} className="bg-orange-50/40 dark:bg-orange-900/10">
-                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: lineColor }}>
-                        {mount.label}
-                      </td>
-                      {filteredData.map((d) => {
-                        const mv = mount.data.find((v) => v.quarter === d.quarter);
-                        return (
-                          <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
-                            {mv ? formatLineValue(mv.value) : '-'}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-
-                  {/* Secondary demand (기기판매량) */}
+                  {/* Secondary bar data row */}
                   {filteredSecondary && (
-                    <tr className="bg-white dark:bg-gray-800">
-                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: secondaryColor }}>
-                        {secondaryLabel}
-                      </td>
-                      {filteredSecondary.map((d) => (
-                        <td
-                          key={d.quarter}
-                          className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
-                            d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
-                          }`}
-                        >
-                          {formatTableValue(d.value)}
+                    <>
+                      <tr className="bg-gray-50 dark:bg-gray-700">
+                        <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: secondaryColor }}>
+                          {secondaryLabel}
                         </td>
-                      ))}
-                    </tr>
-                  )}
-                  {showQoQ && filteredSecondary && (
-                    <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
-                      {filteredSecondary.map((d, i) => {
-                        const prev = i > 0 ? filteredSecondary[i - 1].value : null;
-                        const qoq = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
-                        const sign = qoq !== null && qoq > 0 ? '+' : '';
-                        const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
-                        return (
-                          <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
-                            {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                        {filteredSecondary.map((d) => (
+                          <td key={d.year} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'}`}>
+                            {formatTableValue(d.value)}
                           </td>
-                        );
-                      })}
-                    </tr>
-                  )}
-                  {timeRange === 12 && filteredSecondary && (() => {
-                    const vals = filteredSecondary.map((d) => d.value);
-                    const first = vals[0];
-                    const last = vals[vals.length - 1];
-                    const years = (filteredSecondary.length - 1) / 4;
-                    const cagr = first > 0 && last > 0 && years > 0 ? (Math.pow(last / first, 1 / years) - 1) * 100 : null;
-                    return (
-                      <tr className="bg-blue-50/50 dark:bg-blue-900/20">
-                        <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
-                        <td colSpan={filteredSecondary.length} className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400">
-                          {cagr !== null ? `${cagr > 0 ? '+' : ''}${cagr.toFixed(1)}%` : '-'}
-                        </td>
+                        ))}
                       </tr>
-                    );
-                  })()}
-                  {/* Secondary 대당탑재량 */}
-                  {secondaryMountRows.filter((m) => !(m as MountDataItem & { subgroup?: string }).subgroup).map((mount) => (
+                      {showYoY && (
+                        <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                          <td className="px-2 py-0.5 border border-gray-200 text-[10px] whitespace-nowrap dark:border-gray-600" style={{ color: secondaryColor, opacity: 0.6 }}>YoY</td>
+                          {filteredSecondary.map((d, i) => {
+                            const prev = i > 0 ? filteredSecondary[i - 1].value : null;
+                            const yoy = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
+                            const sign = yoy !== null && yoy > 0 ? '+' : '';
+                            const color = yoy === null ? 'text-gray-300 dark:text-gray-600' : yoy > 0 ? 'text-red-500' : yoy < 0 ? 'text-blue-500' : 'text-gray-400';
+                            return (
+                              <td key={d.year} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                                {yoy !== null ? `${sign}${yoy.toFixed(1)}%` : '-'}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      )}
+                    </>
+                  )}
+                  {/* Secondary mount per unit — right after secondary bar */}
+                  {secondaryMountRows.map((mount) => (
                     <tr key={mount.label} className="bg-gray-50 dark:bg-gray-700">
-                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: mount.color }}>
+                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[11px]" style={{ color: mount.color }}>
                         {mount.label}
                       </td>
                       {filteredData.map((d) => {
-                        const mv = mount.data.find((v) => v.quarter === d.quarter);
+                        const mv = mount.data.find((v) => v.year === d.year);
                         return (
-                          <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
-                            {mv ? (mv.value >= 1 ? mv.value.toFixed(2) : mv.value.toFixed(3)) : '-'}
+                          <td key={d.year} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[11px] ${mv?.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'}`}>
+                            {mv ? mv.value.toFixed(2) : '-'}
                           </td>
                         );
                       })}
@@ -679,120 +505,79 @@ export default function DemandBarChart({
                 </>
               ) : (
                 <>
-                  {/* ── SINGLE BAR section: Wafer수요(월평균) → 기기판매량 → 대당탑재량 ── */}
-
-                  {/* Wafer 수요 (월평균) row — from lineData */}
-                  {hasLine && filteredLine && (
-                    <tr className="bg-gray-100 dark:bg-gray-600">
+                  {/* Wafer 수요 row (single-bar) */}
+                  {waferRows.map((mount) => (
+                    <tr key={mount.label} className="bg-gray-100 dark:bg-gray-600">
                       <td className="px-2 py-1.5 border border-gray-200 font-bold whitespace-nowrap dark:border-gray-600 text-xs" style={{ color: '#111827' }}>
-                        Wafer 수요 (월평균)
-                      </td>
-                      {filteredLine.map((d) => (
-                        <td
-                          key={d.quarter}
-                          className={`px-1.5 py-1.5 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-xs font-bold ${
-                            d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'
-                          }`}
-                        >
-                          {formatLineValue(d.value)}
-                        </td>
-                      ))}
-                    </tr>
-                  )}
-                  {/* Wafer 수요 QoQ (single) */}
-                  {showQoQ && hasLine && filteredLine && (
-                    <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
-                      {filteredLine.map((d, i) => {
-                        const prev = i > 0 ? filteredLine[i - 1].value : 0;
-                        const qoq = i > 0 && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
-                        const sign = qoq !== null && qoq > 0 ? '+' : '';
-                        const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-blue-500' : qoq < 0 ? 'text-red-500' : 'text-gray-400';
-                        return (
-                          <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
-                            {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  )}
-
-                  {/* 기기판매량(ea) */}
-                  <tr className="bg-white dark:bg-gray-800">
-                    <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: barColor }}>
-                      기기판매량 (ea)
-                    </td>
-                    {filteredData.map((d) => (
-                      <td
-                        key={d.quarter}
-                        className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${
-                          d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
-                        }`}
-                      >
-                        {formatTableValue(d.value)}
-                      </td>
-                    ))}
-                  </tr>
-                  {showQoQ && (
-                    <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
-                      {filteredData.map((d, i) => {
-                        const prev = i > 0 ? filteredData[i - 1].value : null;
-                        const qoq = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
-                        const sign = qoq !== null && qoq > 0 ? '+' : '';
-                        const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
-                        return (
-                          <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
-                            {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  )}
-                  {timeRange === 12 && (() => {
-                    const vals = filteredData.map((d) => d.value);
-                    const first = vals[0];
-                    const last = vals[vals.length - 1];
-                    const years = (filteredData.length - 1) / 4;
-                    const cagr = first > 0 && last > 0 && years > 0 ? (Math.pow(last / first, 1 / years) - 1) * 100 : null;
-                    return (
-                      <tr className="bg-blue-50/50 dark:bg-blue-900/20">
-                        <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
-                        <td colSpan={filteredData.length} className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400">
-                          {cagr !== null ? `${cagr > 0 ? '+' : ''}${cagr.toFixed(1)}%` : '-'}
-                        </td>
-                      </tr>
-                    );
-                  })()}
-
-                  {/* 대당탑재량 rows (ungrouped mountData) */}
-                  {ungroupedRows.map((mount, mIdx) => (
-                    <tr key={mount.label} className={mIdx % 2 === 0 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800'}>
-                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: mount.color }}>
                         {mount.label}
                       </td>
                       {filteredData.map((d) => {
-                        const mv = mount.data.find((v) => v.quarter === d.quarter);
+                        const mv = mount.data.find((v) => v.year === d.year);
                         return (
-                          <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
-                            {mv ? (mv.value >= 1 ? mv.value.toFixed(2) : mv.value.toFixed(3)) : '-'}
+                          <td key={d.year} className={`px-1.5 py-1.5 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-xs font-bold ${mv?.isEstimate ? 'text-gray-700 dark:text-gray-200' : 'text-gray-900 dark:text-gray-100'}`}>
+                            {mv ? formatTableValue(mv.value) : '-'}
                           </td>
                         );
                       })}
                     </tr>
                   ))}
-
-                  {/* Wafer rows from mountData if any */}
-                  {waferRows.map((mount) => (
-                    <tr key={mount.label} className="bg-orange-50/40 dark:bg-orange-900/10">
-                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[10px]" style={{ color: lineColor }}>
+                  {/* Wafer YoY (single-bar) */}
+                  {showYoY && waferRows.map((mount) => (
+                    <tr key={`${mount.label}-yoy`} className="bg-gray-50/50 dark:bg-gray-700/30">
+                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] whitespace-nowrap dark:border-gray-600" style={{ color: '#111827', opacity: 0.6 }}>YoY</td>
+                      {filteredData.map((d, i) => {
+                        const cur = mount.data.find((v) => v.year === d.year);
+                        const prev = i > 0 ? mount.data.find((v) => v.year === filteredData[i - 1].year) : null;
+                        const yoy = cur && prev && prev.value > 0 ? ((cur.value - prev.value) / prev.value) * 100 : null;
+                        const sign = yoy !== null && yoy > 0 ? '+' : '';
+                        const color = yoy === null ? 'text-gray-300 dark:text-gray-600' : yoy > 0 ? 'text-red-500' : yoy < 0 ? 'text-blue-500' : 'text-gray-400';
+                        return (
+                          <td key={d.year} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                            {yoy !== null ? `${sign}${yoy.toFixed(1)}%` : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                  {/* Single-bar: primary data row */}
+                  <tr className="bg-white dark:bg-gray-800">
+                    <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600" style={{ color: barColor }}>
+                      {barLabel ?? '기기판매량'}
+                    </td>
+                    {filteredData.map((d) => (
+                      <td key={d.year} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'}`}>
+                        {formatTableValue(d.value)}
+                      </td>
+                    ))}
+                  </tr>
+                  {/* YoY */}
+                  {showYoY && (
+                    <tr className="bg-gray-50/50 dark:bg-gray-700/30">
+                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] whitespace-nowrap dark:border-gray-600" style={{ color: barColor, opacity: 0.6 }}>YoY</td>
+                      {filteredData.map((d, i) => {
+                        const prev = i > 0 ? filteredData[i - 1].value : null;
+                        const yoy = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null;
+                        const sign = yoy !== null && yoy > 0 ? '+' : '';
+                        const color = yoy === null ? 'text-gray-300 dark:text-gray-600' : yoy > 0 ? 'text-red-500' : yoy < 0 ? 'text-blue-500' : 'text-gray-400';
+                        return (
+                          <td key={d.year} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                            {yoy !== null ? `${sign}${yoy.toFixed(1)}%` : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )}
+                  {/* Mount rows (ungrouped for single-bar) */}
+                  {ungroupedRows.map((mount) => (
+                    <tr key={mount.label} className="bg-gray-50 dark:bg-gray-700">
+                      <td className="px-2 py-1 border border-gray-200 font-medium whitespace-nowrap dark:border-gray-600 text-[11px]" style={{ color: mount.color }}>
                         {mount.label}
                       </td>
                       {filteredData.map((d) => {
-                        const mv = mount.data.find((v) => v.quarter === d.quarter);
+                        const mv = mount.data.find((v) => v.year === d.year);
                         return (
-                          <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[10px] ${mv?.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
-                            {mv ? formatLineValue(mv.value) : '-'}
+                          <td key={d.year} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 text-[11px] ${mv?.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'}`}>
+                            {mv ? mv.value.toFixed(2) : '-'}
                           </td>
                         );
                       })}

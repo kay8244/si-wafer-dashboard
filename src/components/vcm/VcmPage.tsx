@@ -2,10 +2,11 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { parseAiBullets, renderWithRefs, CollapsibleBullet, SourceBadge } from '@/lib/news-utils';
-import type { AppCategoryItem, AppCategoryType, ApplicationType, DeviceFilterItem, DeviceStackedEntry, TotalWaferQuarterlyEntry, QuarterlyValue } from '@/types/indicators';
+import type { AppCategoryItem, AppCategoryType, ApplicationType, DeviceFilterItem, DeviceStackedYearlyEntry, TotalWaferYearlyEntry, YearlyValue } from '@/types/indicators';
+import type { MountDataItem } from './DemandBarChart';
 import { useVcmData } from '@/hooks/useVcmData';
 import { useNews, type NewsArticle } from '@/hooks/useNews';
-import TotalWaferLineChart, { type TimeRange } from './TotalWaferLineChart';
+import TotalWaferLineChart from './TotalWaferLineChart';
 import DemandBarChart from './DemandBarChart';
 import DeviceStackedChart from './DeviceStackedChart';
 
@@ -178,7 +179,7 @@ function WaferDemandAnalysis({
   aiAnswer,
   loading,
 }: {
-  data: TotalWaferQuarterlyEntry[];
+  data: TotalWaferYearlyEntry[];
   articles: NewsArticle[];
   aiAnswer: string | null;
   loading: boolean;
@@ -242,9 +243,9 @@ function WaferDemandAnalysis({
         <li className="flex gap-1.5">
           <span className="shrink-0 text-gray-400">•</span>
           <span>
-            {current.quarter} Total Wafer 수요{' '}
+            {current.year}년 Total Wafer 수요{' '}
             <span className="font-semibold text-gray-800 dark:text-gray-200">{current.total.toLocaleString()} K/M</span>
-            {' '}(QoQ{' '}
+            {' '}(YoY{' '}
             <span className={`font-semibold ${isUp ? 'text-red-500' : 'text-blue-500'}`}>
               {isUp ? '+' : ''}{totalChange}%
             </span>)
@@ -252,11 +253,11 @@ function WaferDemandAnalysis({
         </li>
         <li className="flex gap-1.5">
           <span className="shrink-0 text-gray-400">•</span>
-          <span>PW: {current.pw.toLocaleString()} K/M (QoQ {Number(pwChange) >= 0 ? '+' : ''}{pwChange}%, 기여도 {pwContrib}%)</span>
+          <span>PW: {current.pw.toLocaleString()} K/M (YoY {Number(pwChange) >= 0 ? '+' : ''}{pwChange}%, 기여도 {pwContrib}%)</span>
         </li>
         <li className="flex gap-1.5">
           <span className="shrink-0 text-gray-400">•</span>
-          <span>EPI: {current.epi.toLocaleString()} K/M (QoQ {Number(epiChange) >= 0 ? '+' : ''}{epiChange}%, 기여도 {epiContrib}%)</span>
+          <span>EPI: {current.epi.toLocaleString()} K/M (YoY {Number(epiChange) >= 0 ? '+' : ''}{epiChange}%, 기여도 {epiContrib}%)</span>
         </li>
 
         {/* Section header for AI news summary */}
@@ -304,8 +305,8 @@ function WaferDemandAnalysis({
               <li className="flex gap-1.5">
                 <span className="shrink-0 text-gray-400">•</span>
                 <span>
-                  {nextEst.quarter} 전망: Total {nextEst.total.toLocaleString()} K/M
-                  {' '}(QoQ {Number(futureChange) >= 0 ? '+' : ''}{futureChange}%)
+                  {nextEst.year}년 전망: Total {nextEst.total.toLocaleString()} K/M
+                  {' '}(YoY {Number(futureChange) >= 0 ? '+' : ''}{futureChange}%)
                   {Number(futureChange) > 0
                     ? ' — AI/HPC 수요 확대 및 계절적 수요 회복에 따른 상승 전망'
                     : ' — 수요 조정 구간 진입, 재고 조정 영향 예상'
@@ -378,7 +379,6 @@ export default function VcmPage() {
   const [version, setVersion] = useState('');
   const [appCategories, setAppCategories] = useState<AppCategoryItem[]>(INITIAL_APP_CATEGORIES);
   const [deviceFilters, setDeviceFilters] = useState<DeviceFilterItem[]>(INITIAL_DEVICE_FILTERS);
-  const [timeRange, setTimeRange] = useState<TimeRange>(8);
   const [showNews, setShowNews] = useState(false);
 
   // Set initial version once data loads
@@ -417,24 +417,26 @@ export default function VcmPage() {
     '실리콘 웨이퍼 수요 전망 - 반도체 업황이 EPI/SOI 등 실리콘 웨이퍼 수급에 미치는 영향',
   );
 
-  // Primary app chart data
+  // Primary app yearly chart data
   const appChartData = useMemo(() => {
-    return vcmApiData?.applicationQuarterlyDemands[primaryApp] ?? [];
+    return vcmApiData?.appYearlyDemands?.[primaryApp] ?? [];
   }, [vcmApiData, primaryApp]);
 
-  // Secondary app chart data (AI Server for Server, EV for Automotive)
+  // Secondary app yearly chart data (AI Server for Server, EV for Automotive)
   const secondaryChartData = useMemo(() => {
     if (!secondaryApp) return undefined;
-    return vcmApiData?.applicationQuarterlyDemands[secondaryApp] ?? [];
+    return vcmApiData?.appYearlyDemands?.[secondaryApp] ?? [];
   }, [vcmApiData, secondaryApp]);
 
-  // Device stacked data — combine Traditional + AI for Server, automotive + EV for Automotive
+  // Device stacked yearly data — combine Traditional + AI for Server, automotive + EV for Automotive
   const deviceStackedData = useMemo(() => {
     if (!vcmApiData) return [];
+    const byApp = vcmApiData.deviceStackedYearlyByApp;
+    if (!byApp) return [];
     if (isDualCategory) {
-      const primary = vcmApiData.deviceStackedByApp[primaryApp] ?? [];
-      const secondary = secondaryApp ? (vcmApiData.deviceStackedByApp[secondaryApp] ?? []) : [];
-      return primary.map((t, i): DeviceStackedEntry => {
+      const primary = byApp[primaryApp] ?? [];
+      const secondary = secondaryApp ? (byApp[secondaryApp] ?? []) : [];
+      return primary.map((t, i): DeviceStackedYearlyEntry => {
         const a = secondary[i];
         if (!a) return t;
         return {
@@ -450,100 +452,74 @@ export default function VcmPage() {
         };
       });
     }
-    return vcmApiData.deviceStackedByApp[primaryApp] ?? [];
+    return byApp[primaryApp] ?? [];
   }, [vcmApiData, isDualCategory, primaryApp, secondaryApp]);
 
-  // Compute wafer demand (monthly avg) = device_sales * mount_per_unit / 3
-  // quarterlyMountPerUnit is keyed by ApplicationType directly
-  const lineData = useMemo(() => {
-    const qmu = vcmApiData?.quarterlyMountPerUnit;
-    const qDemands = vcmApiData?.applicationQuarterlyDemands;
-    if (!qmu || !qDemands) return [];
+  // Mount table data (yearly) — wafer demand line + device sales + mount-per-unit
+  const mountTableData = useMemo((): MountDataItem[] => {
+    if (!vcmApiData) return [];
+    const rows: MountDataItem[] = [];
 
-    if (isDualCategory) {
-      // For dual categories (Server, Automotive): sum primary + secondary wafer demand
-      const primaryDemand = qDemands[primaryApp] ?? [];
-      const primaryMount = (qmu as Record<string, QuarterlyValue[]>)[APP_LABEL_MAP[primaryApp] ?? primaryApp] ?? [];
-      const secondaryDemand = secondaryApp ? (qDemands[secondaryApp] ?? []) : [];
-      const secondaryMount = secondaryApp ? ((qmu as Record<string, QuarterlyValue[]>)[APP_LABEL_MAP[secondaryApp] ?? secondaryApp] ?? []) : [];
+    // Row 1: Wafer 수요 (월평균) = Σ(기기판매량 × 대당탑재량) / 12
+    const yearlyMount = vcmApiData.yearlyMountPerUnitByCategory?.[selectedCategory.category] ?? [];
+    const primarySales = vcmApiData.appYearlyDemands?.[primaryApp] ?? [];
+    const secondarySales = secondaryApp ? (vcmApiData.appYearlyDemands?.[secondaryApp] ?? []) : [];
+    const primaryMountMetrics = yearlyMount.find((m) => m.serverType === 'traditional')?.metrics ?? [];
+    const secondaryMountMetrics = secondaryApp ? (yearlyMount.find((m) => m.serverType === 'ai')?.metrics ?? []) : [];
 
-      return primaryDemand.map((d) => {
-        const pm = primaryMount.find((m) => m.quarter === d.quarter);
-        const sd = secondaryDemand.find((s) => s.quarter === d.quarter);
-        const sm = secondaryMount.find((m) => m.quarter === d.quarter);
-        const primaryWafer = pm ? (d.value * pm.value) / 3 : 0;
-        const secondaryWafer = sd && sm ? (sd.value * sm.value) / 3 : 0;
-        return { quarter: d.quarter, value: primaryWafer + secondaryWafer, isEstimate: d.isEstimate };
-      });
-    }
-
-    const demand = qDemands[primaryApp] ?? [];
-    const mount = (qmu as Record<string, QuarterlyValue[]>)[APP_LABEL_MAP[primaryApp] ?? primaryApp] ?? [];
-    return demand.map((d) => {
-      const m = mount.find((mv) => mv.quarter === d.quarter);
-      return {
-        quarter: d.quarter,
-        value: m ? (d.value * m.value) / 3 : 0,
-        isEstimate: d.isEstimate,
-      };
+    const years = [...new Set([...primarySales.map((d) => d.year), ...secondarySales.map((d) => d.year)])].filter((y) => y >= 2024 && y <= 2030).sort();
+    const waferData: YearlyValue[] = years.map((year) => {
+      const pSale = primarySales.find((d) => d.year === year)?.value ?? 0;
+      const pMount = primaryMountMetrics.find((d) => d.year === year)?.value ?? 0;
+      const sSale = secondarySales.find((d) => d.year === year)?.value ?? 0;
+      const sMount = secondaryMountMetrics.find((d) => d.year === year)?.value ?? 0;
+      const monthlyWafer = (pSale * pMount + sSale * sMount) / 12;
+      return { year, value: +monthlyWafer.toFixed(1), isEstimate: year > 2025 };
     });
-  }, [vcmApiData, isDualCategory, primaryApp, secondaryApp]);
-
-  // Table rows — order: Wafer수요(월평균) [subgroup:'wafer'] → 기기판매량 → 대당탑재량
-  // group='primary'/'secondary' for dual-bar; no group for single
-  const mountTableData = useMemo(() => {
-    const qmu = vcmApiData?.quarterlyMountPerUnit;
-    const qDemands = vcmApiData?.applicationQuarterlyDemands;
-    if (!qmu || !qDemands) return [];
-
-    type RowItem = { label: string; data: QuarterlyValue[]; color: string; group?: 'primary' | 'secondary'; subgroup?: 'wafer' };
-
-    if (isDualCategory) {
-      const isServer = isServerCategory;
-      const primaryLabel = isServer ? 'Trad.' : '내연기관';
-      const secondaryLabelStr = isServer ? 'AI' : 'EV';
-      const primaryColor = APP_COLORS[categoryKey as keyof typeof APP_COLORS];
-      const secondaryColorVal = '#8b5cf6';
-
-      const tradDemand = qDemands[primaryApp] ?? [];
-      const aiDemand = secondaryApp ? (qDemands[secondaryApp] ?? []) : [];
-      const tradMount = (qmu as Record<string, QuarterlyValue[]>)[APP_LABEL_MAP[primaryApp] ?? primaryApp] ?? [];
-      const aiMount = secondaryApp ? ((qmu as Record<string, QuarterlyValue[]>)[APP_LABEL_MAP[secondaryApp] ?? secondaryApp] ?? []) : [];
-
-      // Wafer rows per group
-      const tradWafer: QuarterlyValue[] = tradDemand.map((d) => {
-        const m = tradMount.find((mv) => mv.quarter === d.quarter);
-        return { quarter: d.quarter, value: m ? (d.value * m.value) / 3 : 0, isEstimate: d.isEstimate };
-      });
-      const aiWafer: QuarterlyValue[] = aiDemand.map((d) => {
-        const m = aiMount.find((mv) => mv.quarter === d.quarter);
-        return { quarter: d.quarter, value: m ? (d.value * m.value) / 3 : 0, isEstimate: d.isEstimate };
-      });
-
-      // Combined wafer demand (primary + secondary)
-      const combinedWafer: QuarterlyValue[] = tradWafer.map((tw, i) => ({
-        quarter: tw.quarter,
-        value: tw.value + (aiWafer[i]?.value ?? 0),
-        isEstimate: tw.isEstimate,
-      }));
-
-      const rows: RowItem[] = [
-        { label: 'Wafer 수요 (월평균)', data: combinedWafer, color: '#111827', group: 'wafer' as 'primary' },
-        { label: `${primaryLabel} 대당탑재량(장)`, data: tradMount, color: primaryColor, group: 'primary' },
-        { label: `${secondaryLabelStr} 대당탑재량(장)`, data: aiMount, color: secondaryColorVal, group: 'secondary' },
-      ];
-      return rows;
+    if (waferData.length > 0) {
+      rows.push({ label: 'Wafer 수요 (월평균)', data: waferData, color: '#111827', group: 'wafer' });
     }
 
-    // Single-bar categories
-    const appMount = (qmu as Record<string, QuarterlyValue[]>)[APP_LABEL_MAP[primaryApp] ?? primaryApp] ?? [];
-    const catColor = APP_COLORS[categoryKey as keyof typeof APP_COLORS];
-    const rows: RowItem[] = [];
-    if (appMount.length > 0) rows.push({ label: '대당탑재량(장)', data: appMount, color: catColor + '99' });
-    return rows;
-  }, [vcmApiData, isDualCategory, isServerCategory, primaryApp, secondaryApp, categoryKey]);
+    // Mount per unit rows for primary app
+    const primaryMount = yearlyMount.find((m) => m.serverType === 'traditional');
+    if (primaryMount) {
+      rows.push({
+        label: primaryMount.label,
+        data: primaryMount.metrics.map((m) => ({ year: m.year, value: m.value, isEstimate: m.year > 2025 })),
+        color: APP_COLORS[selectedCategory.category],
+        group: 'primary',
+      });
+    }
 
-  const totalWaferQuarterly = vcmApiData?.totalWaferQuarterly ?? [];
+    if (isDualCategory && secondaryApp) {
+      // Mount per unit for secondary app
+      const secondaryMount = yearlyMount.find((m) => m.serverType === 'ai');
+      if (secondaryMount) {
+        rows.push({
+          label: secondaryMount.label,
+          data: secondaryMount.metrics.map((m) => ({ year: m.year, value: m.value, isEstimate: m.year > 2025 })),
+          color: '#8b5cf6',
+          group: 'secondary',
+        });
+      }
+    }
+
+    // For single-category: ungrouped mount rows
+    if (!isDualCategory) {
+      const singleMount = yearlyMount.find((m) => m.serverType === 'traditional');
+      if (singleMount) {
+        // Already added above as 'primary' group, remove it and re-add as ungrouped
+        const idx = rows.findIndex((r) => r.group === 'primary' && r.label === singleMount.label);
+        if (idx >= 0) {
+          rows[idx] = { ...rows[idx], group: undefined };
+        }
+      }
+    }
+
+    return rows;
+  }, [vcmApiData, primaryApp, secondaryApp, isDualCategory, selectedCategory]);
+
+  const totalWaferYearly = vcmApiData?.totalWaferYearly ?? [];
 
   function selectCategory(index: number) {
     setAppCategories((prev) =>
@@ -603,15 +579,13 @@ export default function VcmPage() {
 
           {/* Total Wafer Line Chart (includes table inside card) */}
           <TotalWaferLineChart
-            data={totalWaferQuarterly}
-            timeRange={timeRange}
-            onTimeRangeChange={setTimeRange}
+            data={totalWaferYearly}
           />
 
           {/* AI Wafer Demand Analysis */}
           {showNews && (
             <WaferDemandAnalysis
-              data={totalWaferQuarterly}
+              data={totalWaferYearly}
               articles={waferArticles}
               aiAnswer={waferAnswer}
               loading={waferNewsLoading}
@@ -641,17 +615,13 @@ export default function VcmPage() {
 
           {/* App Demand Bar Chart — with time range, dual bars for Server/Automotive, line for Wafer 수요 */}
           <DemandBarChart
-            title={`기기판매량 / Wafer 수요 - ${primaryAppLabel}`}
+            title={`Application별 수요 - ${primaryAppLabel}`}
             data={appChartData}
             barColor={APP_COLORS[categoryKey as keyof typeof APP_COLORS]}
             barLabel={isServerCategory ? 'Trad. Server 기기판매량(ea)' : isAutomotiveCategory ? '내연기관 기기판매량(ea)' : undefined}
             secondaryData={secondaryChartData}
             secondaryLabel={isServerCategory ? 'AI Server 기기판매량(ea)' : isAutomotiveCategory ? 'EV 기기판매량(ea)' : undefined}
             secondaryColor="#8b5cf6"
-            lineData={lineData}
-            lineColor="#111827"
-            timeRange={timeRange}
-            onTimeRangeChange={setTimeRange}
             mountData={mountTableData as import('./DemandBarChart').MountDataItem[]}
           />
 
@@ -704,8 +674,6 @@ export default function VcmPage() {
             title={`Device別 Wafer 수요 - ${primaryAppLabel}`}
             data={deviceStackedData}
             deviceFilters={deviceFilters}
-            timeRange={timeRange}
-            onTimeRangeChange={setTimeRange}
           />
         </div>
       </div>

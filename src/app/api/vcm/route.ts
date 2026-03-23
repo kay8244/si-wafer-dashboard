@@ -16,6 +16,7 @@ import type {
   QuarterlyValue,
   DeviceStackedEntry,
 } from '@/types/indicators';
+import { TOTAL_WAFER_YEARLY, DEVICE_STACKED_YEARLY, APP_YEARLY_DEMANDS, DEVICE_STACKED_YEARLY_BY_APP, TOTAL_WAFER_DEMAND_BY_APP as TOTAL_WAFER_DEMAND_BY_APP_MOCK, YEARLY_MOUNT_PER_UNIT_BY_CATEGORY } from '@/data/vcm-mock';
 
 function parseMeta<T>(row: MetricRow): T {
   try {
@@ -343,9 +344,24 @@ export async function GET() {
     quarterlyMountPerUnit,
   };
 
+  // Merge DB totalWaferDemandByApp with mock data for years not in DB (2027-2030)
+  const mergedTotalWaferDemandByApp: Record<string, TotalWaferDemand[]> = {};
+  for (const [app, mockRows] of Object.entries(TOTAL_WAFER_DEMAND_BY_APP_MOCK)) {
+    const dbRows = totalWaferDemandByApp[app as ApplicationType] ?? [];
+    const dbYears = new Set(dbRows.map((r) => r.year));
+    const extra = mockRows.filter((r) => !dbYears.has(r.year));
+    mergedTotalWaferDemandByApp[app] = [...dbRows, ...extra].sort((a, b) => a.year - b.year);
+  }
+
   return NextResponse.json({
     ...vcmData,
+    totalWaferDemandByApp: mergedTotalWaferDemandByApp,
     newsQueriesByCategory,
     mountPerUnitByCategory,
+    yearlyMountPerUnitByCategory: YEARLY_MOUNT_PER_UNIT_BY_CATEGORY,
+    totalWaferYearly: TOTAL_WAFER_YEARLY,
+    deviceStackedYearly: DEVICE_STACKED_YEARLY,
+    appYearlyDemands: APP_YEARLY_DEMANDS,
+    deviceStackedYearlyByApp: DEVICE_STACKED_YEARLY_BY_APP,
   });
 }

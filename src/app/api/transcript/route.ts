@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getCached, setCache } from '@/lib/cache';
+import { queryMetrics } from '@/lib/db';
 
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -170,11 +171,25 @@ export async function GET(request: NextRequest) {
 
   const cacheKey = `transcript_${customerId}`;
 
-  // Check cache (24h TTL)
+  // Check file/memory cache (24h TTL)
   const cached = await getCached(cacheKey);
   if (cached) {
     return NextResponse.json(cached);
   }
+
+  // Check DB cache (persistent across deploys)
+  try {
+    const dbRows = await queryMetrics('transcript-cache', { customer: customerId });
+    if (dbRows.length > 0) {
+      const row = dbRows[dbRows.length - 1];
+      if (row.metadata) {
+        const dbCached = JSON.parse(row.metadata);
+        // Also set file cache for faster subsequent reads
+        await setCache(cacheKey, dbCached);
+        return NextResponse.json(dbCached);
+      }
+    }
+  } catch { /* DB not available, continue to live fetch */ }
 
   const { queryEn, companyName } = TRANSCRIPT_QUERIES[customerId];
   const quarterLabel = getLatestQuarterLabel();
@@ -242,8 +257,33 @@ export async function GET(request: NextRequest) {
     sources: finalResults.map((r) => ({ title: r.title, url: r.url })),
   };
 
-  // Cache for 24 hours
+  // Cache for 24 hours (file/memory)
   await setCache(cacheKey, result);
+
+  // Also persist to DB so it survives deploys
+  const resultJson = JSON.stringify(result);
+  const dateStr = new Date().toISOString().slice(0, 10);
+  try {
+    const { getDb } = await import('@/lib/db');
+    const db = getDb();
+    db.prepare("DELETE FROM metrics WHERE tab='transcript-cache' AND customer=?").run(customerId);
+    db.prepare("INSERT INTO metrics (tab, date, customer, category, value, unit, is_estimate, version, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+      'transcript-cache', dateStr, customerId, 'transcript_result', null, null, 0, quarterLabel, resultJson,
+    );
+  } catch { /* SQLite write failed */ }
+  // Also try Postgres
+  try {
+    const { isPostgres, getPostgresUrl } = await import('@/lib/db');
+    if (isPostgres()) {
+      const { db: pgDb } = await import('@vercel/postgres');
+      await pgDb.query("DELETE FROM metrics WHERE tab='transcript-cache' AND customer=$1", [customerId]);
+      await pgDb.query(
+        "INSERT INTO metrics (tab, date, customer, category, value, unit, is_estimate, version, metadata) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+        ['transcript-cache', dateStr, customerId, 'transcript_result', null, null, 0, quarterLabel, resultJson],
+      );
+      void getPostgresUrl; // suppress unused
+    }
+  } catch { /* Postgres write failed */ }
 
   return NextResponse.json(result);
 }

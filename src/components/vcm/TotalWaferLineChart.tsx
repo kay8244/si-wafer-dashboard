@@ -10,139 +10,67 @@ import {
   ResponsiveContainer,
   CartesianGrid,
   ReferenceLine,
+  LabelList,
 } from 'recharts';
-import type { TotalWaferQuarterlyEntry } from '@/types/indicators';
+import type { TotalWaferYearlyEntry } from '@/types/indicators';
 import { useDarkMode } from '@/hooks/useDarkMode';
 
-export type TimeRange = 4 | 8 | 12;
+const START_YEAR = 2024;
+const END_YEAR = 2030;
 
 interface Props {
-  data: TotalWaferQuarterlyEntry[];
-  timeRange?: TimeRange;
-  onTimeRangeChange?: (range: TimeRange) => void;
+  data: TotalWaferYearlyEntry[];
 }
-
-const TIME_PRESETS: { value: TimeRange; label: string }[] = [
-  { value: 4, label: '4Q' },
-  { value: 8, label: '8Q' },
-  { value: 12, label: '12Q' },
-];
 
 function formatYAxis(value: number): string {
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
   return String(value);
 }
 
-/** TimeRange value IS the number of quarters to display */
-
-function getYear(quarter: string): string {
-  const match = quarter.match(/'(\d{2})$/);
-  return match ? `20${match[1]}` : '';
-}
-
-function getQuarterLabel(quarter: string): string {
-  const match = quarter.match(/^Q(\d)/);
-  return match ? `${match[1]}Q` : quarter;
-}
-
-export default function TotalWaferLineChart({ data, timeRange: controlledRange, onTimeRangeChange }: Props) {
+export default function TotalWaferLineChart({ data }: Props) {
   const { isDark } = useDarkMode();
-  const [internalRange, setInternalRange] = useState<TimeRange>(8);
-  const [showQoQ, setShowQoQ] = useState(false);
-  const timeRange = controlledRange ?? internalRange;
-  const setTimeRange = onTimeRangeChange ?? setInternalRange;
+  const [showYoY, setShowYoY] = useState(true);
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
   const gridStroke = isDark ? '#334155' : '#e5e7eb';
 
-  // Find current boundary index (last actual data point)
+  // Find current boundary — dynamically based on current year
+  const currentYear = new Date().getFullYear();
   const currentIdx = useMemo(() => {
+    // Last year before or equal to current year
     let idx = -1;
-    for (let i = data.length - 1; i >= 0; i--) {
-      if (!data[i].isEstimate) { idx = i; break; }
+    for (let i = 0; i < data.length; i++) {
+      if (data[i].year <= currentYear) idx = i;
     }
     return idx;
+  }, [data, currentYear]);
+
+  // Filter data to fixed range 2024-2030
+  const filteredData = useMemo(() => {
+    return data.filter((d) => d.year >= START_YEAR && d.year <= END_YEAR);
   }, [data]);
 
-  // Center the view around current boundary
-  const filteredData = useMemo(() => {
-    const quarters = timeRange;
-    const half = Math.floor(quarters / 2);
-    const center = currentIdx >= 0 ? currentIdx : Math.floor(data.length / 2);
-    const start = Math.max(0, center - half);
-    const end = Math.min(data.length, start + quarters);
-    const adjustedStart = Math.max(0, end - quarters);
-    return data.slice(adjustedStart, end);
-  }, [data, timeRange, currentIdx]);
-
-  const boundaryQuarter = currentIdx >= 0 ? data[currentIdx].quarter : undefined;
-
-  // Compute year labels for x-axis grouping
-  const yearLabels = useMemo(() => {
-    const labels: { year: string; startIdx: number; endIdx: number }[] = [];
-    let prevYear = '';
-    filteredData.forEach((d, i) => {
-      const yr = getYear(d.quarter);
-      if (yr !== prevYear) {
-        if (labels.length > 0) labels[labels.length - 1].endIdx = i - 1;
-        labels.push({ year: yr, startIdx: i, endIdx: i });
-        prevYear = yr;
-      } else if (labels.length > 0) {
-        labels[labels.length - 1].endIdx = i;
-      }
-    });
-    return labels;
-  }, [filteredData]);
-
-  // Group data by year for table
-  const yearGroups = useMemo(() => {
-    const groups: { year: string; quarters: TotalWaferQuarterlyEntry[] }[] = [];
-    filteredData.forEach((d) => {
-      const yr = getYear(d.quarter);
-      const last = groups[groups.length - 1];
-      if (last && last.year === yr) {
-        last.quarters.push(d);
-      } else {
-        groups.push({ year: yr, quarters: [d] });
-      }
-    });
-    return groups;
-  }, [filteredData]);
+  const boundaryYear = currentIdx >= 0 ? data[currentIdx].year : undefined;
 
   return (
     <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800" style={{ minHeight: 540 }}>
       {/* Header row: title + time range buttons + legend */}
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="shrink-0 text-base font-bold text-gray-800 dark:text-gray-100">
-          Total Wafer 수요
+          Total Wafer 수요 (월평균)
         </h3>
 
-        {/* QoQ toggle + Time range presets */}
+        {/* YoY toggle */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowQoQ((v) => !v)}
+            onClick={() => setShowYoY((v) => !v)}
             className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
-              showQoQ
+              showYoY
                 ? 'bg-orange-500 text-white shadow-sm'
                 : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
             }`}
           >
-            QoQ
+            YoY
           </button>
-        </div>
-        <div className="flex items-center gap-1">
-          {TIME_PRESETS.map((preset) => (
-            <button
-              key={String(preset.value)}
-              onClick={() => setTimeRange(preset.value)}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                timeRange === preset.value
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
-              }`}
-            >
-              {preset.label}
-            </button>
-          ))}
         </div>
 
         {/* Legend */}
@@ -167,31 +95,13 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
         </div>
       </div>
 
-      {/* Year group labels — larger text */}
-      <div className="mb-1 flex" style={{ marginLeft: 53, marginRight: 16 }}>
-        {yearLabels.map((yl) => {
-          const total = filteredData.length;
-          const span = yl.endIdx - yl.startIdx + 1;
-          const widthPct = (span / total) * 100;
-          return (
-            <div
-              key={yl.year}
-              className="text-center text-sm font-bold text-gray-500 dark:text-gray-400"
-              style={{ width: `${widthPct}%` }}
-            >
-              {yl.year}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Chart area — fixed height */}
+      {/* Chart area */}
       <div style={{ height: 240 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={filteredData} margin={{ top: 28, right: 16, left: 8, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
             <XAxis
-              dataKey="quarter"
+              dataKey="year"
               tick={{ fontSize: 11, fill: tickFill }}
               axisLine={false}
               tickLine={false}
@@ -202,6 +112,7 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
               axisLine={false}
               tickLine={false}
               width={45}
+              domain={[(min: number) => Math.max(0, Math.floor((min * 0.8) / 50) * 50), (max: number) => Math.ceil((max * 1.1) / 50) * 50]}
               label={{ value: 'K/M', angle: -90, position: 'insideLeft', fontSize: 11, fill: tickFill, offset: 5 }}
             />
             <Tooltip
@@ -209,14 +120,15 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
                 const label = name === 'pw' ? 'PW' : name === 'epi' ? 'EPI' : 'Total';
                 return [`${(value ?? 0).toLocaleString()} K/M`, label];
               }}
+              labelFormatter={(label) => `${label}년`}
               contentStyle={isDark
                 ? { fontSize: 13, borderRadius: 6, backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' }
                 : { fontSize: 13, borderRadius: 6 }
               }
             />
-            {boundaryQuarter && filteredData.some((d) => d.quarter === boundaryQuarter) && (
+            {boundaryYear && filteredData.some((d) => d.year === boundaryYear) && (
               <ReferenceLine
-                x={boundaryQuarter}
+                x={boundaryYear}
                 stroke={isDark ? '#fbbf24' : '#dc2626'}
                 strokeDasharray="4 4"
                 strokeWidth={1.5}
@@ -256,11 +168,11 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
               stroke="#2563eb"
               strokeWidth={2.5}
               dot={(props: Record<string, unknown>) => {
-                const { cx, cy, payload } = props as { cx: number; cy: number; payload: TotalWaferQuarterlyEntry };
+                const { cx, cy, payload } = props as { cx: number; cy: number; payload: TotalWaferYearlyEntry };
                 if (!payload) return <circle key="empty-pw" />;
                 return (
                   <circle
-                    key={`pw-${payload.quarter}`}
+                    key={`pw-${payload.year}`}
                     cx={cx}
                     cy={cy}
                     r={4}
@@ -271,7 +183,9 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
                 );
               }}
               activeDot={{ r: 6, fill: '#2563eb' }}
-            />
+            >
+              <LabelList dataKey="pw" position="top" formatter={(v: unknown) => formatYAxis(Number(v))} style={{ fontSize: 9, fill: '#2563eb', fontWeight: 600 }} offset={8} />
+            </Line>
             {/* EPI line - green */}
             <Line
               type="monotone"
@@ -279,11 +193,11 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
               stroke="#10b981"
               strokeWidth={2.5}
               dot={(props: Record<string, unknown>) => {
-                const { cx, cy, payload } = props as { cx: number; cy: number; payload: TotalWaferQuarterlyEntry };
+                const { cx, cy, payload } = props as { cx: number; cy: number; payload: TotalWaferYearlyEntry };
                 if (!payload) return <circle key="empty-epi" />;
                 return (
                   <circle
-                    key={`epi-${payload.quarter}`}
+                    key={`epi-${payload.year}`}
                     cx={cx}
                     cy={cy}
                     r={4}
@@ -294,44 +208,30 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
                 );
               }}
               activeDot={{ r: 6, fill: '#10b981' }}
-            />
+            >
+              <LabelList dataKey="epi" position="bottom" formatter={(v: unknown) => formatYAxis(Number(v))} style={{ fontSize: 9, fill: '#10b981', fontWeight: 600 }} offset={8} />
+            </Line>
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Data table — year-merged header, EPI/PW order */}
+      {/* Data table — yearly */}
       {filteredData.length > 0 && (
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
+          <table className="w-full text-xs border-collapse table-fixed">
             <thead>
-              {/* Year row with colspan */}
               <tr className="bg-gray-100 dark:bg-gray-700">
-                <th
-                  rowSpan={2}
-                  className="text-left px-2 py-1 border border-gray-200 font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-300 whitespace-nowrap align-middle"
-                >
+                <th className="text-left px-2 py-1 border border-gray-200 font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-300 whitespace-nowrap">
                   구분
                 </th>
-                {yearGroups.map((g) => (
-                  <th
-                    key={g.year}
-                    colSpan={g.quarters.length}
-                    className="text-center px-1 py-1 border border-gray-200 font-bold text-gray-700 dark:border-gray-600 dark:text-gray-200 whitespace-nowrap"
-                  >
-                    {g.year}
-                  </th>
-                ))}
-              </tr>
-              {/* Quarter row */}
-              <tr className="bg-gray-50 dark:bg-gray-600">
                 {filteredData.map((d) => (
                   <th
-                    key={d.quarter}
-                    className={`text-center px-1.5 py-1 border border-gray-200 font-semibold whitespace-nowrap dark:border-gray-600 ${
-                      d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-600 dark:text-gray-300'
+                    key={d.year}
+                    className={`text-center px-1.5 py-1 border border-gray-200 font-bold whitespace-nowrap dark:border-gray-600 ${
+                      d.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'
                     }`}
                   >
-                    {getQuarterLabel(d.quarter)}
+                    {d.year}
                   </th>
                 ))}
               </tr>
@@ -341,23 +241,23 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
               <tr className="bg-white dark:bg-gray-800">
                 <td className="px-2 py-1 border border-gray-200 font-medium text-emerald-600 whitespace-nowrap dark:border-gray-600">EPI</td>
                 {filteredData.map((d) => (
-                  <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>
+                  <td key={d.year} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'}`}>
                     {d.epi.toLocaleString()}K
                   </td>
                 ))}
               </tr>
-              {/* EPI QoQ */}
-              {showQoQ && (
+              {/* EPI YoY */}
+              {showYoY && (
                 <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-emerald-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-emerald-400 whitespace-nowrap dark:border-gray-600">YoY</td>
                   {filteredData.map((d, i) => {
                     const prev = i > 0 ? filteredData[i - 1].epi : null;
-                    const qoq = prev && prev > 0 ? ((d.epi - prev) / prev) * 100 : null;
-                    const sign = qoq !== null && qoq > 0 ? '+' : '';
-                    const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                    const yoy = prev && prev > 0 ? ((d.epi - prev) / prev) * 100 : null;
+                    const sign = yoy !== null && yoy > 0 ? '+' : '';
+                    const color = yoy === null ? 'text-gray-300 dark:text-gray-600' : yoy > 0 ? 'text-red-500' : yoy < 0 ? 'text-blue-500' : 'text-gray-400';
                     return (
-                      <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
-                        {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                      <td key={d.year} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                        {yoy !== null ? `${sign}${yoy.toFixed(1)}%` : '-'}
                       </td>
                     );
                   })}
@@ -367,23 +267,23 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
               <tr className="bg-gray-50 dark:bg-gray-700">
                 <td className="px-2 py-1 border border-gray-200 font-medium text-blue-600 whitespace-nowrap dark:border-gray-600">PW</td>
                 {filteredData.map((d) => (
-                  <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>
+                  <td key={d.year} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'}`}>
                     {d.pw.toLocaleString()}K
                   </td>
                 ))}
               </tr>
-              {/* PW QoQ */}
-              {showQoQ && (
+              {/* PW YoY */}
+              {showYoY && (
                 <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-blue-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-blue-400 whitespace-nowrap dark:border-gray-600">YoY</td>
                   {filteredData.map((d, i) => {
                     const prev = i > 0 ? filteredData[i - 1].pw : null;
-                    const qoq = prev && prev > 0 ? ((d.pw - prev) / prev) * 100 : null;
-                    const sign = qoq !== null && qoq > 0 ? '+' : '';
-                    const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                    const yoy = prev && prev > 0 ? ((d.pw - prev) / prev) * 100 : null;
+                    const sign = yoy !== null && yoy > 0 ? '+' : '';
+                    const color = yoy === null ? 'text-gray-300 dark:text-gray-600' : yoy > 0 ? 'text-red-500' : yoy < 0 ? 'text-blue-500' : 'text-gray-400';
                     return (
-                      <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
-                        {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                      <td key={d.year} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                        {yoy !== null ? `${sign}${yoy.toFixed(1)}%` : '-'}
                       </td>
                     );
                   })}
@@ -393,33 +293,33 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
               <tr className="bg-gray-100 dark:bg-gray-600 font-semibold">
                 <td className="px-2 py-1 border border-gray-200 font-semibold text-gray-700 whitespace-nowrap dark:border-gray-600 dark:text-gray-200">Total</td>
                 {filteredData.map((d) => (
-                  <td key={d.quarter} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-200'}`}>
+                  <td key={d.year} className={`px-1.5 py-1 border border-gray-200 text-right tabular-nums whitespace-nowrap dark:border-gray-600 ${d.isEstimate ? 'text-gray-600 dark:text-gray-300' : 'text-gray-700 dark:text-gray-200'}`}>
                     {d.total.toLocaleString()}K
                   </td>
                 ))}
               </tr>
-              {/* Total QoQ */}
-              {showQoQ && (
+              {/* Total YoY */}
+              {showYoY && (
                 <tr className="bg-gray-50/50 dark:bg-gray-700/30">
-                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">QoQ</td>
+                  <td className="px-2 py-0.5 border border-gray-200 text-[10px] text-gray-400 whitespace-nowrap dark:border-gray-600">YoY</td>
                   {filteredData.map((d, i) => {
                     const prev = i > 0 ? filteredData[i - 1].total : null;
-                    const qoq = prev && prev > 0 ? ((d.total - prev) / prev) * 100 : null;
-                    const sign = qoq !== null && qoq > 0 ? '+' : '';
-                    const color = qoq === null ? 'text-gray-300 dark:text-gray-600' : qoq > 0 ? 'text-red-500' : qoq < 0 ? 'text-blue-500' : 'text-gray-400';
+                    const yoy = prev && prev > 0 ? ((d.total - prev) / prev) * 100 : null;
+                    const sign = yoy !== null && yoy > 0 ? '+' : '';
+                    const color = yoy === null ? 'text-gray-300 dark:text-gray-600' : yoy > 0 ? 'text-red-500' : yoy < 0 ? 'text-blue-500' : 'text-gray-400';
                     return (
-                      <td key={d.quarter} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
-                        {qoq !== null ? `${sign}${qoq.toFixed(1)}%` : '-'}
+                      <td key={d.year} className={`px-1.5 py-0.5 border border-gray-200 text-right tabular-nums whitespace-nowrap text-[10px] dark:border-gray-600 ${color}`}>
+                        {yoy !== null ? `${sign}${yoy.toFixed(1)}%` : '-'}
                       </td>
                     );
                   })}
                 </tr>
               )}
-              {/* CAGR rows (12Q only) */}
-              {timeRange === 12 && (() => {
+              {/* CAGR row (all range) */}
+              {(() => {
                 const first = filteredData[0];
                 const last = filteredData[filteredData.length - 1];
-                const years = (filteredData.length - 1) / 4;
+                const years = filteredData.length - 1;
                 if (!first || !last || years <= 0) return null;
                 const calc = (start: number, end: number) =>
                   start > 0 && end > 0 ? (Math.pow(end / start, 1 / years) - 1) * 100 : null;
@@ -428,17 +328,15 @@ export default function TotalWaferLineChart({ data, timeRange: controlledRange, 
                 const totalCagr = calc(first.total, last.total);
                 const fmt = (v: number | null) => v !== null ? `${v > 0 ? '+' : ''}${v.toFixed(1)}%` : '-';
                 return (
-                  <>
-                    <tr className="bg-blue-50/50 dark:bg-blue-900/20">
-                      <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
-                      <td
-                        colSpan={filteredData.length}
-                        className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400"
-                      >
-                        EPI {fmt(epiCagr)} / PW {fmt(pwCagr)} / Total {fmt(totalCagr)}
-                      </td>
-                    </tr>
-                  </>
+                  <tr className="bg-blue-50/50 dark:bg-blue-900/20">
+                    <td className="px-2 py-0.5 border border-gray-200 text-[10px] font-semibold text-blue-600 whitespace-nowrap dark:border-gray-600 dark:text-blue-400">CAGR</td>
+                    <td
+                      colSpan={filteredData.length}
+                      className="px-1.5 py-0.5 border border-gray-200 text-center text-[10px] font-semibold text-blue-600 dark:border-gray-600 dark:text-blue-400"
+                    >
+                      EPI {fmt(epiCagr)} / PW {fmt(pwCagr)} / Total {fmt(totalCagr)}
+                    </td>
+                  </tr>
                 );
               })()}
             </tbody>
