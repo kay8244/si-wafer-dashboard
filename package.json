@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint src/",
     "seed": "npx tsx scripts/seed.ts",
-    "seed:pg": "npx tsx scripts/seed-postgres.ts"
+    "seed:pg": "npx tsx scripts/seed-postgres.ts",
+    "validate": "npx tsx scripts/validate.ts",
+    "postinstall": "npx tsx scripts/seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
