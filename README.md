@@ -305,7 +305,7 @@ VALUES (
 | `monthly_inventoryMonths` | 월별 재고월수 | 개월 |
 | `financial_revenue` | 분기별 매출 | $B |
 | `financial_operatingIncome` | 분기별 영업이익 | $B |
-| `transcript` | Earnings Transcript AI 요약 | - |
+| `transcript` | Earnings Transcript AI 요약 (목업: Tavily+AI, 실데이터: DB 직접 적재) | - |
 | `industry_metric` | 산업 지표 (가동률, 매출 등) | 혼합 |
 
 ### 6. VCM 데이터 (`tab = 'vcm'`)

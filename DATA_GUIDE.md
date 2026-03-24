@@ -408,18 +408,61 @@ customer 키: `server`, `smartphone`, `pc`, `automotive`, `industrial`
 #### Transcript 캐시 (`tab = 'transcript-cache'`)
 
 Earnings Transcript AI 요약을 DB에 캐시합니다. 배포 후에도 유지됩니다.
+`seed` 실행 시에도 삭제되지 않습니다 (`DELETE FROM metrics WHERE tab != 'transcript-cache'`).
 
-```sql
--- 자동으로 /api/transcript 호출 시 저장됨 (수동 입력 불필요)
--- category='transcript_result', metadata에 전체 응답 JSON
-INSERT INTO metrics (tab, date, customer, category, value, unit, version, metadata) VALUES
-('transcript-cache', '2026-03-24', 'SEC', 'transcript_result', NULL, NULL, '4Q25',
- '{"quarter":"4Q25","summary":"...","structured":{"sections":[...]},"sources":[...]}');
+**목업 데이터 (자동 생성):**
+
+현재는 Tavily API로 웹에서 실적 발표 내용을 검색한 뒤 Anthropic Claude로 요약하여 캐시합니다.
+```bash
+# 자동 생성 (Tavily + Anthropic API 키 필요)
+curl http://localhost:3000/api/transcript?customer=SEC
 ```
 
-> Transcript 캐시는 `/api/transcript?customer=SEC` 호출 시 자동 저장됩니다.
-> 수동 재생성: `curl http://localhost:3000/api/transcript?customer=SEC`
-> 전체 재생성: file cache 삭제 후 모든 고객 호출
+**실데이터 적재 (권장):**
+
+실제 운영 시에는 Tavily 웹 검색 대신 **실제 Earnings Call 원문/사내 요약 자료**를 직접 DB에 적재합니다.
+Anthropic AI가 구조화된 요약(실적/전망/CapEx)을 생성하며, 그 결과를 DB에 저장합니다.
+
+```sql
+-- 방법 1: 직접 요약 결과를 DB에 적재 (API 호출 없이)
+INSERT INTO metrics (tab, date, customer, category, value, unit, version, metadata) VALUES
+('transcript-cache', '2026-03-24', 'SEC', 'transcript_result', NULL, NULL, '4Q25',
+ '{"quarter":"4Q25","summary":"[실적] 매출 67.5조원, 영업이익 6.6조원...",
+   "structured":{"sections":[
+     {"title":"실적","brief":"매출 67.5조원, 영업이익 6.6조원","detail":"전분기 대비 매출 +5.2%, 영업이익 +12.3%. HBM 매출 비중 40% 돌파."},
+     {"title":"시장 전망 및 가이던스","brief":"AI 서버 수요 지속 확대 전망","detail":"2026년 HBM3E 물량 확대, DDR5 전환 가속. 서버 DRAM 비중 상승."},
+     {"title":"투자현황 (CapEx)","brief":"연간 CapEx 52조원 계획","detail":"P4 Fab 증설, 선단공정 전환 투자 집중. HBM 전용 라인 확대."}
+   ]},
+   "pdfUrl":"https://...",
+   "sources":[{"title":"Samsung Q4 2025 Earnings","url":"https://..."}]}');
+```
+
+```sql
+-- 방법 2: 기존 캐시 교체 (특정 고객만)
+DELETE FROM metrics WHERE tab='transcript-cache' AND customer='SEC';
+INSERT INTO metrics (...) VALUES (...);  -- 위와 동일
+```
+
+**structured JSON 구조:**
+
+| 필드 | 설명 |
+|------|------|
+| `quarter` | 분기 라벨 (예: `"4Q25"`) |
+| `summary` | 1줄 요약 (하위 호환용) |
+| `structured.sections` | 3개 섹션 배열 (아래 참고) |
+| `pdfUrl` | 원문 PDF/링크 URL (선택) |
+| `sources` | 출처 배열 `[{title, url}]` (선택) |
+
+**structured.sections (3개 고정):**
+
+| title | brief | detail |
+|-------|-------|--------|
+| `실적` | 매출/영업이익 1줄 | 매출, 영업이익, 마진율, 전분기 대비 2~3줄 |
+| `시장 전망 및 가이던스` | 향후 전망 1줄 | 가이던스, 수요 전망 2~3줄 |
+| `투자현황 (CapEx)` | 설비투자 1줄 | CapEx 규모, 투자 방향 2~3줄 |
+
+> **참고**: 모든 내용은 **한국어**로 작성해야 합니다.
+> 실데이터 적재 시 Tavily/Anthropic API 키 없이도 동작합니다 (DB에서 직접 읽음).
 
 ---
 
@@ -547,22 +590,23 @@ INSERT INTO metrics (tab, date, customer, category, value, unit, is_estimate) VA
 
 #### Earnings Transcript AI 요약
 
-Earnings Call 텍스트를 저장하면 `POST /api/transcript`가 Anthropic AI로 요약합니다.
-`TranscriptSummary` 컴포넌트에서 실시간 요약을 표시합니다.
+고객사별 최근 실적 발표(Earnings Call)의 AI 요약을 표시합니다.
 
-```sql
--- SEC 2025년 Q1 Earnings Call 원문 (metadata에 저장)
-INSERT INTO metrics (tab, date, customer, category, value, unit, metadata) VALUES
-('customer-detail', 'Q1''25', 'SEC', 'transcript', NULL, NULL,
- '{"rawText":"Good morning. Thank you for joining...","lang":"en"}');
-```
+**데이터 흐름 (2가지 방식):**
 
-**metadata JSON 필드:**
+| 방식 | 데이터 소스 | API 키 필요 | 설명 |
+|------|-----------|------------|------|
+| **자동 (목업)** | Tavily 웹 검색 → Anthropic AI 요약 | 필요 | `/api/transcript?customer=SEC` 호출 시 자동 생성 |
+| **수동 (실데이터)** | 실제 Earnings Call 원문/사내 자료 | 불필요 | DB에 직접 요약 결과 적재 |
 
-| 필드 | 설명 | 예시 |
-|------|------|------|
-| `rawText` | Earnings Call 원문 텍스트 | 영문/한글 문자열 |
-| `lang` | 원문 언어 | `"en"`, `"ko"` |
+**실데이터 적재 시:**
+
+실제 운영 환경에서는 Tavily 웹 검색이 아닌, 사내에서 보유한 실적 발표 원문이나 애널리스트 요약을 직접 DB에 적재합니다.
+`transcript-cache` 탭에 구조화된 요약 JSON을 저장하면, API 키 없이도 고객별 탭에서 바로 표시됩니다.
+
+상세 적재 방법은 **VCM 섹션의 [Transcript 캐시](#transcript-캐시-tab--transcript-cache)** 를 참고하세요.
+
+> **핵심**: 실데이터 적재 시 `customer-detail` 탭의 `transcript` 카테고리가 아닌, **`transcript-cache` 탭의 `transcript_result` 카테고리**에 적재해야 합니다.
 
 #### 산업 지표 (IndustryMetricsPanel)
 
