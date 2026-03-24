@@ -1017,8 +1017,8 @@ function seedMemoryPriceIndicators(): Row[] {
 function main() {
   const db = getDb();
 
-  // Clear existing data
-  db.exec('DELETE FROM metrics');
+  // Clear existing data (preserve transcript cache)
+  db.exec("DELETE FROM metrics WHERE tab != 'transcript-cache'");
 
   const insert = db.prepare(`
     INSERT INTO metrics (tab, date, customer, category, value, unit, is_estimate, version, metadata)

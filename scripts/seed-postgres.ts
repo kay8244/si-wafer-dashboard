@@ -615,8 +615,8 @@ async function main() {
       CREATE INDEX IF NOT EXISTS idx_tab_cat ON metrics(tab, category);
     `);
 
-    // Clear existing data
-    await client.query('DELETE FROM metrics');
+    // Clear existing data (preserve transcript cache)
+    await client.query("DELETE FROM metrics WHERE tab != 'transcript-cache'");
 
     const insertRows = async (label: string, rows: Row[]) => {
       process.stdout.write(`Seeding ${label}...`);
