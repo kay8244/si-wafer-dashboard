@@ -358,7 +358,7 @@ export default function DemandBarChart({
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-gray-100 dark:bg-gray-700">
-                <th className="text-left px-2 py-1 border border-gray-200 font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-300 whitespace-nowrap">
+                <th className="text-left px-2 py-1 border border-gray-200 font-semibold text-gray-600 dark:border-gray-600 dark:text-gray-300 whitespace-nowrap" style={{ width: '1%' }}>
                   구분
                 </th>
                 {filteredData.map((d) => (
