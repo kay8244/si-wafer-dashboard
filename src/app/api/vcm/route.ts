@@ -11,10 +11,7 @@ import type {
   DeviceWaferDemand,
   MountPerUnit,
   TotalWaferDemand,
-  TotalWaferQuarterlyEntry,
   VcmNews,
-  QuarterlyValue,
-  DeviceStackedEntry,
   TotalWaferYearlyEntry,
   DeviceStackedYearlyEntry,
   YearlyValue,
@@ -142,54 +139,6 @@ export async function GET() {
   }
   const mountPerUnitByApp = mountByAppMap as Record<ApplicationType, MountPerUnit[]>;
 
-  // ── totalWaferDemand ──────────────────────────────────────────────────────
-  // category='totalWaferDemand', customer='total', date=year, value=total
-  const totalRows = byCategory['totalWaferDemand'] ?? [];
-  const totalWaferDemand: TotalWaferDemand[] = totalRows
-    .map((r) => ({
-      year: parseInt(r.date, 10),
-      total: r.value ?? 0,
-      isEstimate: r.is_estimate === 1,
-    }))
-    .sort((a, b) => a.year - b.year);
-
-  // ── totalWaferDemandByApp ─────────────────────────────────────────────────
-  // category='totalWaferDemandByApp', customer=application, date=year
-  const totalByAppRows = byCategory['totalWaferDemandByApp'] ?? [];
-  const totalByAppMap: Record<string, TotalWaferDemand[]> = {};
-  for (const r of totalByAppRows) {
-    const app = r.customer;
-    if (!totalByAppMap[app]) totalByAppMap[app] = [];
-    totalByAppMap[app].push({
-      year: parseInt(r.date, 10),
-      total: r.value ?? 0,
-      isEstimate: r.is_estimate === 1,
-    });
-  }
-  for (const v of Object.values(totalByAppMap)) v.sort((a, b) => a.year - b.year);
-  const totalWaferDemandByApp = totalByAppMap as Record<ApplicationType, TotalWaferDemand[]>;
-
-  // ── totalWaferQuarterly ───────────────────────────────────────────────────
-  // Three separate category rows: 'totalWaferQuarterly_total', '_pw', '_epi'
-  // date=quarter, value=number
-  const twqTotal = byCategory['totalWaferQuarterly_total'] ?? [];
-  const twqPw = byCategory['totalWaferQuarterly_pw'] ?? [];
-  const twqEpi = byCategory['totalWaferQuarterly_epi'] ?? [];
-  // Build quarter-keyed maps
-  const twqPwMap: Record<string, number> = {};
-  const twqEpiMap: Record<string, number> = {};
-  const twqIsEstimate: Record<string, boolean> = {};
-  for (const r of twqPw) twqPwMap[r.date] = r.value ?? 0;
-  for (const r of twqEpi) twqEpiMap[r.date] = r.value ?? 0;
-  for (const r of twqTotal) twqIsEstimate[r.date] = r.is_estimate === 1;
-  const totalWaferQuarterly: TotalWaferQuarterlyEntry[] = twqTotal.map((r) => ({
-    quarter: r.date,
-    total: r.value ?? 0,
-    pw: twqPwMap[r.date] ?? 0,
-    epi: twqEpiMap[r.date] ?? 0,
-    isEstimate: r.is_estimate === 1,
-  }));
-
   // ── news ──────────────────────────────────────────────────────────────────
   // category='vcmNews', customer=source, date=date, version=title, metadata={summary}
   const newsRows = byCategory['vcmNews'] ?? [];
@@ -245,67 +194,6 @@ export async function GET() {
   for (const v of Object.values(appTableMap)) v.yearly.sort((a, b) => a.year - b.year);
   const applicationTable = Object.values(appTableMap);
 
-  // ── applicationQuarterlyDemands ───────────────────────────────────────────
-  // category='quarterlyDemand', customer=application, date=quarter, metadata={application}
-  const qDemandRows = byCategory['quarterlyDemand'] ?? [];
-  const qDemandMap: Record<string, QuarterlyValue[]> = {};
-  for (const r of qDemandRows) {
-    const meta = parseMeta<{ application?: string }>(r);
-    const app = meta.application ?? r.customer;
-    if (!qDemandMap[app]) qDemandMap[app] = [];
-    qDemandMap[app].push({
-      quarter: r.date,
-      value: r.value ?? 0,
-      isEstimate: r.is_estimate === 1,
-    });
-  }
-  const applicationQuarterlyDemands = qDemandMap as Record<ApplicationType, QuarterlyValue[]>;
-
-  // ── deviceStackedByApp ────────────────────────────────────────────────────
-  // DB: category='stacked_{deviceType}', customer=appLabel, date=quarter,
-  //     metadata={application: appKey}, value=Kwsm
-  // Need to group by application key, then by quarter, then set device values
-  const stackedAppMap: Record<string, Record<string, Partial<DeviceStackedEntry>>> = {};
-  for (const [cat, catRows] of Object.entries(byCategory)) {
-    if (!cat.startsWith('stacked_')) continue;
-    const deviceType = cat.replace('stacked_', ''); // e.g., 'dram', 'hbm'
-    for (const r of catRows) {
-      const meta = parseMeta<{ application?: string }>(r);
-      const app = meta.application ?? r.customer;
-      const quarter = r.date;
-      if (!stackedAppMap[app]) stackedAppMap[app] = {};
-      if (!stackedAppMap[app][quarter]) {
-        stackedAppMap[app][quarter] = {
-          quarter,
-          isEstimate: r.is_estimate === 1,
-          dram: 0, hbm: 0, nand: 0, otherMemory: 0,
-          logic: 0, analog: 0, discrete: 0, sensor: 0,
-        };
-      }
-      (stackedAppMap[app][quarter] as Record<string, unknown>)[deviceType] = r.value ?? 0;
-      if (r.is_estimate === 1) stackedAppMap[app][quarter]!.isEstimate = true;
-    }
-  }
-  const deviceStackedByApp: Record<ApplicationType, DeviceStackedEntry[]> = {} as Record<ApplicationType, DeviceStackedEntry[]>;
-  for (const [app, quarterMap] of Object.entries(stackedAppMap)) {
-    deviceStackedByApp[app as ApplicationType] = Object.values(quarterMap) as DeviceStackedEntry[];
-  }
-
-  // ── quarterlyMountPerUnit ─────────────────────────────────────────────────
-  // category='quarterlyMountPerUnit', customer=application, date=quarter
-  const qMountRows = byCategory['quarterlyMountPerUnit'] ?? [];
-  const qMountMap: Record<string, QuarterlyValue[]> = {};
-  for (const r of qMountRows) {
-    const app = r.customer;
-    if (!qMountMap[app]) qMountMap[app] = [];
-    qMountMap[app].push({
-      quarter: r.date,
-      value: r.value ?? 0,
-      isEstimate: r.is_estimate === 1,
-    });
-  }
-  const quarterlyMountPerUnit = qMountMap as Record<ApplicationType, QuarterlyValue[]>;
-
   // ── mountPerUnitByCategory ────────────────────────────────────────────────
   // category='mountPerUnitByCategory_{appCategory}', same structure as mountPerUnit
   const mountByCatMap: Record<string, MountPerUnit[]> = {};
@@ -335,15 +223,9 @@ export async function GET() {
     deviceWaferDemands,
     mountPerUnit,
     mountPerUnitByApp,
-    totalWaferDemand,
-    totalWaferDemandByApp,
-    totalWaferQuarterly,
     news,
     newsQueries,
     applicationTable,
-    applicationQuarterlyDemands,
-    deviceStackedByApp,
-    quarterlyMountPerUnit,
   };
 
   // ── totalWaferYearly ─────────────────────────────────────────────────────
@@ -423,7 +305,7 @@ export async function GET() {
   for (const v of Object.values(dsYearlyByAppMap)) v.sort((a, b) => a.year - b.year);
   const deviceStackedYearlyByApp = dsYearlyByAppMap as Record<ApplicationType, DeviceStackedYearlyEntry[]>;
 
-  // ── totalWaferDemandByApp (yearly, from new category) ──────────────────
+  // ── totalWaferDemandByAppYearly ────────────────────────────────────────
   // category='totalWaferDemandByAppYearly', customer=appKey, date=year, value=total
   const twdByAppYearlyRows = byCategory['totalWaferDemandByAppYearly'] ?? [];
   const twdByAppYearlyMap: Record<string, TotalWaferDemand[]> = {};
@@ -437,16 +319,7 @@ export async function GET() {
     });
   }
   for (const v of Object.values(twdByAppYearlyMap)) v.sort((a, b) => a.year - b.year);
-  // Merge the quarterly-derived totalWaferDemandByApp with the yearly version
-  const mergedTotalWaferDemandByApp: Record<string, TotalWaferDemand[]> = {};
-  const allAppKeys = new Set([...Object.keys(totalByAppMap), ...Object.keys(twdByAppYearlyMap)]);
-  for (const app of allAppKeys) {
-    const quarterlyRows2 = totalByAppMap[app] ?? [];
-    const yearlyRows2 = twdByAppYearlyMap[app] ?? [];
-    const qYears = new Set(quarterlyRows2.map((r) => r.year));
-    const extra = yearlyRows2.filter((r) => !qYears.has(r.year));
-    mergedTotalWaferDemandByApp[app] = [...quarterlyRows2, ...extra].sort((a, b) => a.year - b.year);
-  }
+  const totalWaferDemandByApp = twdByAppYearlyMap as Record<ApplicationType, TotalWaferDemand[]>;
 
   // ── yearlyMountPerUnitByCategory ───────────────────────────────────────
   // category='yearlyMountPerUnitByCategory', customer=label, date=year,
@@ -480,7 +353,7 @@ export async function GET() {
 
   return NextResponse.json({
     ...vcmData,
-    totalWaferDemandByApp: mergedTotalWaferDemandByApp,
+    totalWaferDemandByApp,
     newsQueriesByCategory,
     mountPerUnitByCategory,
     yearlyMountPerUnitByCategory,

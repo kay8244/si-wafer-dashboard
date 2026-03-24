@@ -1167,13 +1167,7 @@ export const VCM_DATA: VcmData = {
   deviceWaferDemands: DEVICE_WAFER_DEMANDS,
   mountPerUnit: MOUNT_PER_UNIT,
   mountPerUnitByApp: MOUNT_PER_UNIT_BY_APP,
-  totalWaferDemand: TOTAL_WAFER_DEMAND,
-  totalWaferDemandByApp: TOTAL_WAFER_DEMAND_BY_APP,
-  totalWaferQuarterly: TOTAL_WAFER_QUARTERLY,
   news: VCM_NEWS,
   newsQueries: NEWS_QUERIES,
   applicationTable: APPLICATION_TABLE,
-  applicationQuarterlyDemands: QUARTERLY_DEMANDS,
-  deviceStackedByApp: DEVICE_STACKED_BY_APP,
-  quarterlyMountPerUnit: QUARTERLY_MOUNT_PER_UNIT,
 };

@@ -31,7 +31,7 @@ ANTHROPIC_API_KEY=sk-ant-...   # 뉴스 AI 요약 기능용 (선택)
 TAVILY_API_KEY=tvly-...        # 뉴스 검색용 (선택)
 
 # 3. 목업 데이터로 DB 생성 (테스트용)
-npm run seed                          # SQLite (18,471 rows)
+npm run seed                          # SQLite (17,522 rows)
 npx tsx scripts/seed-postgres.ts      # Postgres (배포용, 선택)
 
 # 4. 개발 서버 실행
@@ -349,30 +349,7 @@ INSERT INTO metrics (tab, date, customer, category, value, unit, is_estimate, me
 
 **device 키:** `dram`, `hbm`, `nand`, `foundry`, `discrete`, `otherMemory`, `logic`, `analog`, `sensor`
 
-#### Total Wafer 분기별
-
-```sql
--- 3개 행이 한 세트 (total, pw, epi)
-INSERT INTO metrics (tab, date, customer, category, value, unit, is_estimate) VALUES
-('vcm', 'Q2''24', 'Total', 'totalWaferQuarterly_total', 1650, 'Kwsm', 0),
-('vcm', 'Q2''24', 'Total', 'totalWaferQuarterly_pw',    1010, 'Kwsm', 0),
-('vcm', 'Q2''24', 'Total', 'totalWaferQuarterly_epi',   640,  'Kwsm', 0);
-```
-
-#### Device Stacked 분기별 (앱별 디바이스 분해)
-
-```sql
--- 각 디바이스별 1행씩 (8개 디바이스 × 분기)
-INSERT INTO metrics (tab, date, customer, category, value, unit, is_estimate, metadata) VALUES
-('vcm', 'Q2''24', 'Traditional Server', 'stacked_dram',       280, 'Kwsm', 0, '{"application":"traditionalServer"}'),
-('vcm', 'Q2''24', 'Traditional Server', 'stacked_hbm',        5,   'Kwsm', 0, '{"application":"traditionalServer"}'),
-('vcm', 'Q2''24', 'Traditional Server', 'stacked_nand',       120, 'Kwsm', 0, '{"application":"traditionalServer"}'),
-('vcm', 'Q2''24', 'Traditional Server', 'stacked_otherMemory',18,  'Kwsm', 0, '{"application":"traditionalServer"}'),
-('vcm', 'Q2''24', 'Traditional Server', 'stacked_logic',      52,  'Kwsm', 0, '{"application":"traditionalServer"}'),
-('vcm', 'Q2''24', 'Traditional Server', 'stacked_analog',     14,  'Kwsm', 0, '{"application":"traditionalServer"}'),
-('vcm', 'Q2''24', 'Traditional Server', 'stacked_discrete',   22,  'Kwsm', 0, '{"application":"traditionalServer"}'),
-('vcm', 'Q2''24', 'Traditional Server', 'stacked_sensor',     6,   'Kwsm', 0, '{"application":"traditionalServer"}');
-```
+> 참고: 기존 분기별 데이터(totalWaferQuarterly, quarterlyDemand, stacked_*, quarterlyMountPerUnit)는 연간 데이터로 대체되어 더 이상 사용하지 않습니다.
 
 #### VCM 연간 차트 데이터 (년도 기반, 2024-2030)
 
@@ -705,10 +682,10 @@ sqlite3 data/dashboard.db "DELETE FROM metrics WHERE tab='customer-detail' AND c
 ```bash
 # SQLite
 rm data/dashboard.db
-npm run seed                          # 18,471 rows
+npm run seed                          # 17,522 rows
 
 # Postgres (배포용)
-npx tsx scripts/seed-postgres.ts      # 18,471 rows
+npx tsx scripts/seed-postgres.ts      # 17,522 rows
 ```
 
 ### Q: Postgres를 사용 중인데 데이터가 안 바뀌어요
@@ -1020,7 +997,7 @@ npx tsx scripts/validate.ts
   데이터 적재 검증 결과
 ========================================
 
-  ✓ 전체 데이터: 총 18,471행
+  ✓ 전체 데이터: 총 17,522행
   ✓ 탭: supply-chain: 6,482행
   ✓ 탭: vcm: 1,179행
   ✓ 탭: customer-detail: 10,431행

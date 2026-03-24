@@ -154,78 +154,6 @@ function seedVcm(): Row[] {
     }
   }
 
-  // Total wafer demand (yearly)
-  for (const t of VCM_DATA.totalWaferDemand) {
-    rows.push(row('vcm', t.year.toString(), 'Total', 'totalWaferDemand', t.total, 'K/M', t.isEstimate ? 1 : 0));
-  }
-
-  // Total wafer quarterly
-  for (const q of VCM_DATA.totalWaferQuarterly) {
-    const est = q.isEstimate ? 1 : 0;
-    rows.push(row('vcm', q.quarter, 'Total', 'totalWaferQuarterly_total', q.total, 'K/M', est));
-    rows.push(row('vcm', q.quarter, 'Total', 'totalWaferQuarterly_pw', q.pw, 'K/M', est));
-    rows.push(row('vcm', q.quarter, 'Total', 'totalWaferQuarterly_epi', q.epi, 'K/M', est));
-  }
-
-  // Quarterly demands per app
-  for (const [appKey, quarters] of Object.entries(VCM_DATA.applicationQuarterlyDemands)) {
-    const app = VCM_DATA.applicationDemands[appKey as keyof typeof VCM_DATA.applicationDemands];
-    const appLabel = app?.label ?? appKey;
-    for (const q of quarters) {
-      rows.push(
-        row(
-          'vcm',
-          q.quarter,
-          appLabel,
-          'quarterlyDemand',
-          q.value,
-          'units',
-          q.isEstimate ? 1 : 0,
-          null,
-          JSON.stringify({ application: appKey }),
-        ),
-      );
-    }
-  }
-
-  // Device stacked by app (quarterly)
-  for (const [appKey, entries] of Object.entries(VCM_DATA.deviceStackedByApp)) {
-    const app = VCM_DATA.applicationDemands[appKey as keyof typeof VCM_DATA.applicationDemands];
-    const appLabel = app?.label ?? appKey;
-    for (const entry of entries) {
-      const est = entry.isEstimate ? 1 : 0;
-      const meta = JSON.stringify({ application: appKey });
-      const deviceTypes = ['dram', 'hbm', 'nand', 'otherMemory', 'logic', 'analog', 'discrete', 'sensor'] as const;
-      for (const dt of deviceTypes) {
-        const val = entry[dt];
-        if (val !== undefined) {
-          rows.push(row('vcm', entry.quarter, appLabel, `stacked_${dt}`, val, 'K/M', est, null, meta));
-        }
-      }
-    }
-  }
-
-  // Quarterly mount per unit
-  for (const [appKey, quarters] of Object.entries(VCM_DATA.quarterlyMountPerUnit)) {
-    const app = VCM_DATA.applicationDemands[appKey as keyof typeof VCM_DATA.applicationDemands];
-    const appLabel = app?.label ?? appKey;
-    for (const q of quarters) {
-      rows.push(
-        row(
-          'vcm',
-          q.quarter,
-          appLabel,
-          'quarterlyMountPerUnit',
-          q.value,
-          'sheets/unit',
-          q.isEstimate ? 1 : 0,
-          null,
-          JSON.stringify({ application: appKey }),
-        ),
-      );
-    }
-  }
-
   // Mount per unit (yearly)
   for (const entry of VCM_DATA.mountPerUnit) {
     for (const metric of entry.metrics) {
@@ -322,27 +250,6 @@ function seedVcm(): Row[] {
     for (const y of entry.yearly) {
       rows.push(
         row('vcm', y.year.toString(), entry.application, 'applicationTable', y.value, 'units', y.isEstimate ? 1 : 0),
-      );
-    }
-  }
-
-  // Total wafer demand by app
-  for (const [appKey, totals] of Object.entries(VCM_DATA.totalWaferDemandByApp)) {
-    const app = VCM_DATA.applicationDemands[appKey as keyof typeof VCM_DATA.applicationDemands];
-    const appLabel = app?.label ?? appKey;
-    for (const t of totals) {
-      rows.push(
-        row(
-          'vcm',
-          t.year.toString(),
-          appLabel,
-          'totalWaferDemandByApp',
-          t.total,
-          'K/M',
-          t.isEstimate ? 1 : 0,
-          null,
-          JSON.stringify({ application: appKey }),
-        ),
       );
     }
   }

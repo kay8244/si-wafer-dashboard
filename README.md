@@ -29,7 +29,7 @@ DATABASE_URL=           # 또는 이것
 
 ```bash
 npm install
-npm run seed             # SQLite DB 생성 (data/dashboard.db, 18,471 rows)
+npm run seed             # SQLite DB 생성 (data/dashboard.db, 17,522 rows)
 npm run dev              # http://localhost:3000
 npm run build            # 프로덕션 빌드 (에러 검증용)
 ```
@@ -320,10 +320,10 @@ VALUES (
 
 ```bash
 # SQLite (로컬)
-npm run seed                   # src/data/*-mock.ts -> data/dashboard.db (18,471 rows)
+npm run seed                   # src/data/*-mock.ts -> data/dashboard.db (17,522 rows)
 
 # Postgres (배포용)
-npx tsx scripts/seed-postgres.ts  # 동일 데이터 -> Postgres (18,471 rows)
+npx tsx scripts/seed-postgres.ts  # 동일 데이터 -> Postgres (17,522 rows)
 ```
 
 ### 실데이터 적재

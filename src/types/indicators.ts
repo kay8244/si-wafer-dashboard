@@ -148,15 +148,9 @@ export interface VcmData {
   deviceWaferDemands: Record<DeviceType, DeviceWaferDemand>;
   mountPerUnit: MountPerUnit[];
   mountPerUnitByApp: Record<ApplicationType, MountPerUnit[]>;
-  totalWaferDemand: TotalWaferDemand[];
-  totalWaferDemandByApp: Record<ApplicationType, TotalWaferDemand[]>;
-  totalWaferQuarterly: TotalWaferQuarterlyEntry[];
   news: VcmNews[];
   newsQueries: Record<ApplicationType, { queryKo: string; queryEn: string }>;
   applicationTable: { application: string; yearly: { year: number; value: number; isEstimate: boolean }[] }[];
-  applicationQuarterlyDemands: Record<ApplicationType, QuarterlyValue[]>;
-  deviceStackedByApp: Record<ApplicationType, DeviceStackedEntry[]>;
-  quarterlyMountPerUnit: Record<ApplicationType, QuarterlyValue[]>;
 }
 
 // --- 고객별 (Customer Detail) ---
