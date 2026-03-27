@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { MetricRow } from '@/lib/db';
-import { queryByCustomer, queryMetrics } from '@/lib/db';
+import { queryByCustomer, queryMetrics, parseMeta } from '@/lib/db';
 import type {
   CustomerExecutive,
   CustomerDetailId,
@@ -38,14 +38,6 @@ async function queryCustomerList(): Promise<{ id: string; label: string; type: s
     });
   } catch {
     return [];
-  }
-}
-
-function parseMeta<T>(row: MetricRow): T {
-  try {
-    return JSON.parse(row.metadata ?? '{}') as T;
-  } catch {
-    return {} as T;
   }
 }
 
@@ -448,6 +440,7 @@ function buildCustomerExecutive(customerId: string, rows: MetricRow[]): Customer
 }
 
 export async function GET(request: NextRequest) {
+  try {
   const { searchParams } = new URL(request.url);
   const customerParam = searchParams.get('customer');
 
@@ -487,4 +480,8 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({ customerList, customers });
+  } catch (err) {
+    console.error('[customer-detail] GET error:', err);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
 }

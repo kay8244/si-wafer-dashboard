@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   ComposedChart,
   Bar,
@@ -171,13 +171,92 @@ export default function DemandBarChart({
     return [bottom, top];
   }, [chartData]);
 
+  // AI analysis state
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const aiLoadingRef = useRef(false);
+
+  const fetchAiInsight = async () => {
+    if (aiOpen && aiInsight && !aiLoadingRef.current) { setAiOpen(false); return; }
+    if (aiLoadingRef.current) return;
+    setAiOpen(true);
+    setAiLoading(true);
+    aiLoadingRef.current = true;
+    setAiInsight(null);
+    try {
+      const primaryLabel = barLabel ?? title;
+      const dataLines = filteredData.map((d) => `${d.year}: ${formatTableValue(d.value)} ${d.isEstimate ? '(예측)' : '(실적)'}`).join('\n');
+      const secLines = filteredSecondary && filteredSecondary.length > 0
+        ? filteredSecondary.map((d) => `${d.year}: ${formatTableValue(d.value)}`).join('\n')
+        : '';
+      const hasDual = !!secondaryData && secondaryData.length > 0;
+      // Group mount data by type
+      const primaryMount = (mountData ?? []).filter((m) => m.group === 'primary' || (!m.group && !hasDual));
+      const secondaryMount = (mountData ?? []).filter((m) => m.group === 'secondary');
+      const waferMount = (mountData ?? []).filter((m) => m.group === 'wafer');
+      const formatMount = (items: MountDataItem[]) => items.map((m) => {
+        const recent = m.data.filter((d) => d.year >= START_YEAR).map((d) => `${d.year}=${d.value}`).join(', ');
+        return `  ${m.label}: ${recent}`;
+      }).join('\n');
+      const thisYear = new Date().getFullYear();
+      const nextYear = thisYear + 1;
+
+      let analysisRequest = '';
+      if (hasDual) {
+        analysisRequest = `분석 요청:
+1. ${primaryLabel} 기기판매량 추이 + 대당탑재량 변화 (2~3줄)
+2. ${secondaryLabel} 기기판매량 추이 + 대당탑재량 변화 (2~3줄)
+3. 올해(${thisYear})~내년(${nextYear}) 두 카테고리 비교 핵심 (1~2줄)
+4. 웨이퍼 수요 관점 시사점 (1~2줄)`;
+      } else {
+        analysisRequest = `분석 요청:
+1. 기기판매량 장기 추이 + 대당탑재량 변화 (2~3줄)
+2. 올해(${thisYear})~내년(${nextYear}) 핵심 포인트 (1~2줄)
+3. 웨이퍼 수요 관점 시사점 (1~2줄)`;
+      }
+
+      const context = `[${title} 수요 분석]
+
+${primaryLabel} 기기판매량:
+${dataLines}
+${secLines ? `\n${secondaryLabel} 기기판매량:\n${secLines}` : ''}
+${primaryMount.length > 0 ? `\n${primaryLabel} 대당탑재량:\n${formatMount(primaryMount)}` : ''}
+${secondaryMount.length > 0 ? `\n${secondaryLabel} 대당탑재량:\n${formatMount(secondaryMount)}` : ''}
+${waferMount.length > 0 ? `\n월평균 웨이퍼 수요:\n${formatMount(waferMount)}` : ''}
+
+${analysisRequest}
+규칙: 상관관계 불필요. 총 8줄 이내. 수치 근거 필수.`;
+
+      const res = await fetch('/api/ai-insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tab: 'vcm-app', context }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const resData = await res.json();
+      if (resData.success && resData.insight) setAiInsight(resData.insight);
+    } catch { /* ignore */ }
+    finally { setAiLoading(false); aiLoadingRef.current = false; }
+  };
+
+  // Auto-refetch when app category changes while panel is open
+  const prevTitleRef = useRef(title);
+  useEffect(() => {
+    if (aiOpen && title !== prevTitleRef.current) {
+      setAiInsight(null);
+      fetchAiInsight();
+    }
+    prevTitleRef.current = title;
+  }, [title, aiOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Mount table data (remaining rows — waferRows declared earlier)
   const primaryMountRows = useMemo(() => mountData?.filter((m) => m.group === 'primary') ?? [], [mountData]);
   const secondaryMountRows = useMemo(() => mountData?.filter((m) => m.group === 'secondary') ?? [], [mountData]);
   const ungroupedRows = useMemo(() => mountData?.filter((m) => !m.group) ?? [], [mountData]);
 
   return (
-    <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800" style={{ minHeight: 540 }}>
+    <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800">
       {/* Header: title + time range selector */}
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">{title}</h3>
@@ -191,6 +270,15 @@ export default function DemandBarChart({
             }`}
           >
             YoY
+          </button>
+          <button
+            onClick={fetchAiInsight}
+            disabled={aiLoading}
+            className={`rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+              aiOpen ? 'bg-indigo-500 text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+            }`}
+          >
+            {aiLoading ? '분석 중...' : '데이터분석'}
           </button>
         </div>
       </div>
@@ -587,6 +675,42 @@ export default function DemandBarChart({
               )}
             </tbody>
           </table>
+        </div>
+      )}
+      {/* AI Analysis */}
+      {aiOpen && (
+        <div className="mt-3 rounded-lg border border-gray-200 bg-slate-50/80 p-3 dark:border-gray-700 dark:bg-slate-800/40">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-bold text-indigo-500 dark:text-indigo-400">AI {title} 분석</span>
+            <button onClick={() => setAiOpen(false)} className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">닫기</button>
+          </div>
+          {aiLoading && !aiInsight && (
+            <div className="animate-pulse space-y-2">
+              <div className="h-3.5 w-5/6 rounded bg-gray-200 dark:bg-gray-700" />
+              <div className="h-3.5 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
+              <div className="h-3.5 w-4/6 rounded bg-gray-200 dark:bg-gray-700" />
+            </div>
+          )}
+          {aiInsight && (
+            <ul className="space-y-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+              {aiInsight.split('\n').filter(Boolean).map((line, i) => {
+                if (line.startsWith('●')) {
+                  return (
+                    <li key={i} className="flex items-start gap-1.5 mt-2 first:mt-0">
+                      <span className="mt-0.5 shrink-0 text-gray-500 dark:text-gray-400">●</span>
+                      <span className="text-[13px] font-semibold text-gray-800 dark:text-gray-200">{line.replace(/^●\s*/, '')}</span>
+                    </li>
+                  );
+                }
+                return (
+                  <li key={i} className="flex items-start gap-1.5 pl-4">
+                    <span className="mt-1 shrink-0 text-gray-400">•</span>
+                    <span className="text-[12px]">{line.replace(/^-\s*/, '')}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       )}
     </div>

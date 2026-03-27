@@ -14,7 +14,10 @@ export function useCustomerDetailData() {
 
   useEffect(() => {
     fetch('/api/customer-detail')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then(setData)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

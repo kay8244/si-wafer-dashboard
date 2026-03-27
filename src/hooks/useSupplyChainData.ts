@@ -36,7 +36,10 @@ export function useSupplyChainData() {
 
   useEffect(() => {
     fetch('/api/supply-chain')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then(setData)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

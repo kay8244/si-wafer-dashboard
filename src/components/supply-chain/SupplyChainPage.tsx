@@ -20,7 +20,7 @@ const VIEW_MODES: { value: ViewMode; label: string }[] = [
 ];
 
 export default function SupplyChainPage() {
-  const { data, loading } = useSupplyChainData();
+  const { data, loading, error } = useSupplyChainData();
 
   const [selectedCategory, setSelectedCategory] = useState<SupplyChainCategoryId>('macro');
   const [selectedIndicatorIds, setSelectedIndicatorIds] = useState<string[]>([]);
@@ -116,10 +116,18 @@ export default function SupplyChainPage() {
     updateOverlay(selectedCompanies, m);
   };
 
-  if (loading || !data) {
+  if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <p className="text-sm text-red-500">데이터를 불러올 수 없습니다. {error}</p>
       </div>
     );
   }
@@ -185,9 +193,9 @@ export default function SupplyChainPage() {
         <div className="flex min-w-0 flex-1 flex-col gap-5">
           {/* Content: Server tab or regular indicators */}
           {showServerTab ? (
-            <ServerLeadingIndicators indicators={data.serverIndicators} />
+            <ServerLeadingIndicators indicators={data.serverIndicators} overlayData={overlayData} />
           ) : showMemoryPriceTab ? (
-            <MemoryPriceIndicators indicators={data.memoryPriceIndicators} />
+            <MemoryPriceIndicators indicators={data.memoryPriceIndicators} overlayData={overlayData} />
           ) : (
             <>
               {/* Table */}
@@ -208,6 +216,7 @@ export default function SupplyChainPage() {
                 viewMode={viewMode}
                 overlayData={overlayData}
               />
+
             </>
           )}
         </div>

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import type { MetricRow } from '@/lib/db';
 import { queryMetrics, queryMetricsLike, queryMetricsIn } from '@/lib/db';
 import type {
   SupplyChainCategory,
@@ -13,6 +12,7 @@ import type {
 } from '@/types/indicators';
 
 export async function GET() {
+  try {
   const TAB = 'supply-chain';
 
   // 1. Indicator metadata rows
@@ -305,4 +305,8 @@ export async function GET() {
     serverIndicators,
     memoryPriceIndicators,
   });
+  } catch (err) {
+    console.error('[supply-chain] GET error:', err);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
 }

@@ -13,6 +13,7 @@ interface VcmApiData extends VcmData {
   mountPerUnitByCategory: Record<AppCategoryType, MountPerUnit[]>;
   yearlyMountPerUnitByCategory: Record<AppCategoryType, YearlyMountItem[]>;
   totalWaferYearly: TotalWaferYearlyEntry[];
+  totalWaferYearlyInternal: TotalWaferYearlyEntry[];
   deviceStackedYearly: DeviceStackedYearlyEntry[];
   appYearlyDemands: Record<ApplicationType, YearlyValue[]>;
   deviceStackedYearlyByApp: Record<ApplicationType, DeviceStackedYearlyEntry[]>;
@@ -20,18 +21,23 @@ interface VcmApiData extends VcmData {
 
 export type { VcmApiData, YearlyMountItem };
 
-export function useVcmData() {
+export function useVcmData(version?: string) {
   const [data, setData] = useState<VcmApiData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/vcm')
-      .then(res => res.json())
+    setLoading(true);
+    const url = `/api/vcm${version ? `?version=${version}` : ''}`;
+    fetch(url)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then(setData)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [version]);
 
   return { data, loading, error };
 }

@@ -10,6 +10,8 @@
     "seed": "npx tsx scripts/seed.ts",
     "seed:pg": "npx tsx scripts/seed-postgres.ts",
     "validate": "npx tsx scripts/validate.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "postinstall": "npx tsx scripts/seed.ts"
   },
   "dependencies": {
@@ -35,6 +37,7 @@
     "@types/pg": "^8.18.0",
     "dotenv": "^17.3.1",
     "pg": "^8.20.0",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "vitest": "^4.1.1"
   }
 }

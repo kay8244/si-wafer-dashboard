@@ -2,6 +2,25 @@
 
 실트론 MI플랫폼 현황판의 데이터베이스에 실데이터를 적재하는 방법을 설명합니다.
 
+## 적재 대상 요약
+
+| 적재 대상 | 주기 | 상세 섹션 |
+|-----------|------|-----------|
+| 전방시장 외부 지표 (18개) — Actual/3MMA/12MMA/MoM/YoY | 매월 | [4-1 > 1-2](#4-1-전방시장-탭-tab--supply-chain) |
+| 내부 CAPA / 투입량 / 가동률 (회사별) | 매월 | [4-1 > 1-3](#4-1-전방시장-탭-tab--supply-chain) |
+| Server 선행지표 (14개) | 매월 | [4-1 > 3](#3-server-선행지표-tab--supply-chain-category--server_indicator) |
+| Memory Price (15개) | 매월 | [4-1 > 4](#4-memory-price-tab--supply-chain-category--memory_price) |
+| VCM 시장 수요 (Total Wafer, App별, Device별) — **버전별 적재** | 반기/연간 | [4-2](#4-2-vcm-탭-tab--vcm) |
+| VCM 영업 수요 (customer='Internal') — **버전별 적재** | 반기/연간 | [4-2 > 1b](#4-2-vcm-탭-tab--vcm) |
+| 고객별 월별 메트릭 (투입량/가동률/재고 등) | 매월 | [4-3](#4-3-고객별-탭-tab--customer-detail) |
+| 고객별 재무실적 (매출/영업이익) | 분기 | [4-3](#4-3-고객별-탭-tab--customer-detail) |
+| Foundry 노드별 가동률 (TSMC/UMC) | 매월 | [4-1 > 2](#2-foundry-노드별-가동률-tab--supply-chain-category--foundry_node) |
+| Transcript (실적 발표 요약) | 분기 | [4-2 > Transcript 캐시](#transcript-캐시-tab--transcript-cache) |
+
+> 뉴스 요약과 AI 데이터분석은 자동 생성 (Anthropic API) — 별도 적재 불필요
+
+---
+
 ## 목차
 
 1. [환경 준비](#1-환경-준비)
@@ -27,19 +46,19 @@
 npm install
 
 # 2. 환경변수 설정 (.env.local 파일 생성)
-ANTHROPIC_API_KEY=sk-ant-...   # 뉴스 AI 요약 기능용 (선택)
+ANTHROPIC_API_KEY=sk-ant-...   # 뉴스 AI 요약 + AI 데이터분석용 (Vercel에도 등록 필요)
 TAVILY_API_KEY=tvly-...        # 뉴스 검색용 (선택)
 
 # 3. 목업 데이터로 DB 생성 (테스트용)
-npm run seed                          # SQLite (17,522 rows)
-npx tsx scripts/seed-postgres.ts      # Postgres (배포용, 선택)
+npm run seed                          # SQLite (18,141 rows — VCM 2버전 포함)
+npx tsx scripts/seed-postgres.ts      # Postgres (배포용, 동일 데이터)
 
 # 4. 개발 서버 실행
 npm run dev
 ```
 
 > **DB 선택**: `.env.local`에 `POSTGRES_URL` 또는 `DATABASE_URL`이 있으면 Postgres, 없으면 SQLite(`data/dashboard.db`)를 자동 사용합니다.
-> **주의**: Postgres 사용 시 `seed-postgres.ts`도 실행해야 데이터가 반영됩니다.
+> **주의**: Postgres 사용 시 `seed-postgres.ts`도 실행해야 데이터가 반영됩니다. 두 seed 스크립트는 동일한 데이터(VCM 버전별, 영업 Data 포함)를 생성합니다.
 
 ---
 
@@ -328,12 +347,59 @@ INSERT INTO metrics (tab, date, customer, category, value, unit, version) VALUES
 
 ### 4-2. VCM 탭 (`tab = 'vcm'`)
 
+#### 버전 관리
+
+VCM 데이터는 전망 시점별로 `version` 필드로 구분됩니다. UI의 버전 셀렉트에서 전환하면 해당 버전 데이터만 표시됩니다.
+
+```sql
+-- 버전 메타 등록 (version=NULL, 공통)
+INSERT INTO metrics (tab, date, customer, category, value, unit)
+VALUES ('vcm', '2025-04-01', '2025-04', 'vcmVersion', NULL, NULL);
+
+INSERT INTO metrics (tab, date, customer, category, value, unit)
+VALUES ('vcm', '2025-10-01', '2025-10', 'vcmVersion', NULL, NULL);
+```
+
+**모든 VCM 데이터 행에 `version` 필드를 지정해야 합니다:**
+
+```sql
+-- 2025-04 버전
+INSERT INTO metrics (tab, date, customer, category, value, unit, version, metadata)
+VALUES ('vcm', '2024', 'Total', 'totalWaferYearly', 800, 'K/M', '2025-04', '{"pw":464,"epi":336}');
+
+-- 2025-10 버전 (동일 구조, version과 값만 다름)
+INSERT INTO metrics (tab, date, customer, category, value, unit, version, metadata)
+VALUES ('vcm', '2024', 'Total', 'totalWaferYearly', 824, 'K/M', '2025-10', '{"pw":478,"epi":346}');
+```
+
+**version 규칙:**
+
+| 데이터 종류 | version 값 | 설명 |
+|------------|-----------|------|
+| 수요/탑재량/웨이퍼 등 실제 데이터 | `'2025-04'`, `'2025-10'` 등 | 전망 시점별로 각각 적재 |
+| `vcmVersion`, `newsQuery`, `newsQueryByCategory` | `NULL` | 공통 메타, 버전 무관 |
+
+**2번째 버전 간편 적재 (1번째 복사 후 값만 수정):**
+
+```sql
+-- 1. 첫 번째 버전 데이터를 복사하여 두 번째 버전 생성
+INSERT INTO metrics (tab, date, customer, category, value, unit, is_estimate, version, metadata)
+SELECT tab, date, customer, category, value, unit, is_estimate, '2025-10', metadata
+FROM metrics
+WHERE tab = 'vcm' AND version = '2025-04';
+
+-- 2. 변경된 값만 UPDATE
+UPDATE metrics SET value = 824, metadata = '{"pw":478,"epi":346}'
+WHERE tab = 'vcm' AND version = '2025-10'
+  AND category = 'totalWaferYearly' AND customer = 'Total' AND date = '2024';
+```
+
 #### Application 수요 (연간)
 
 ```sql
--- 예시: AI Server 2025년 수요
-INSERT INTO metrics (tab, date, customer, category, value, unit, is_estimate, metadata) VALUES
-('vcm', '2025', 'AI/Highpower Server', 'appDemand', 950000, 'units', 1,
+-- 예시: AI Server 2025년 수요 (version 필수!)
+INSERT INTO metrics (tab, date, customer, category, value, unit, is_estimate, version, metadata) VALUES
+('vcm', '2025', 'AI/Highpower Server', 'appDemand', 950000, 'units', 1, '2025-04',
  '{"application":"aiServer"}');
 ```
 
@@ -362,6 +428,19 @@ INSERT INTO metrics (tab, date, customer, category, value, unit, metadata) VALUE
 ('vcm', '2024', 'Total', 'totalWaferYearly', 800, 'K/M',
  '{"pw":464,"epi":336,"isEstimate":false}');
 ```
+
+**1b. Total Wafer 수요 내부데이터** (`category = 'totalWaferYearly'`, `customer = 'Internal'`)
+
+시장 데이터와 동일한 구조이며, `customer='Internal'`로 구분합니다. UI에서 "내부Data" 토글 버튼으로 표시/숨김합니다.
+
+```sql
+INSERT INTO metrics (tab, date, customer, category, value, unit, is_estimate, metadata) VALUES
+('vcm', '2024', 'Internal', 'totalWaferYearly', 810, 'K/M', 0, '{"pw":472,"epi":338}'),
+('vcm', '2025', 'Internal', 'totalWaferYearly', 870, 'K/M', 0, '{"pw":525,"epi":345}'),
+('vcm', '2026', 'Internal', 'totalWaferYearly', 930, 'K/M', 1, '{"pw":558,"epi":372}');
+```
+
+> **참고**: `customer='Total'`은 시장 데이터(공개), `customer='Internal'`은 내부 전망 데이터. 동일한 `category`, `metadata` 구조를 공유합니다.
 
 **2. Application별 연간 수요** (`category = 'appYearlyDemand'`)
 ```sql
@@ -396,7 +475,26 @@ INSERT INTO metrics (tab, date, customer, category, value, unit, metadata) VALUE
  '{"isEstimate":false}');
 ```
 
-**6. 대당탑재량** (`category = 'yearlyMountPerUnitByCategory'`)
+**6. Application별 대당탑재량** (`category = 'mountPerUnitByApp_{appKey}'`)
+```sql
+-- category에 앱 키를 suffix로 포함 (예: mountPerUnitByApp_aiServer)
+INSERT INTO metrics (tab, date, customer, category, value, unit, metadata) VALUES
+('vcm', '2024', 'AI Server DRAM', 'mountPerUnitByApp_aiServer', 2048, 'GB/대',
+ '{"application":"aiServer","serverType":"ai"}');
+```
+appKey: `traditionalServer`, `aiServer`, `smartphone`, `pcNotebook`, `electricVehicle`, `ioe`, `automotive`
+
+**7. Category별 대당탑재량** (`category = 'mountPerUnitByCategory_{catKey}'`)
+```sql
+INSERT INTO metrics (tab, date, customer, category, value, unit, metadata) VALUES
+('vcm', '2024', 'Trad. Server 대당탑재량', 'mountPerUnitByCategory_server', 1.15, '장/대',
+ '{"categoryType":"server","serverType":"traditional"}');
+```
+catKey: `server`, `smartphone`, `pc`, `automotive`, `industrial`
+
+> **중요**: `mountPerUnitByApp`과 `mountPerUnitByCategory`는 반드시 `_{키}` suffix 포함. flat 이름으로 INSERT하면 API에서 조회되지 않습니다.
+
+**8. 연간 대당탑재량** (`category = 'yearlyMountPerUnitByCategory'`)
 ```sql
 -- customer=app category, metadata에 serverType/label/value/unit
 INSERT INTO metrics (tab, date, customer, category, value, unit, metadata) VALUES
@@ -726,10 +824,10 @@ sqlite3 data/dashboard.db "DELETE FROM metrics WHERE tab='customer-detail' AND c
 ```bash
 # SQLite
 rm data/dashboard.db
-npm run seed                          # 17,522 rows
+npm run seed                          # 18,141 rows
 
 # Postgres (배포용)
-npx tsx scripts/seed-postgres.ts      # 17,522 rows
+npx tsx scripts/seed-postgres.ts      # 18,141 rows
 ```
 
 ### Q: Postgres를 사용 중인데 데이터가 안 바뀌어요
@@ -1041,7 +1139,7 @@ npx tsx scripts/validate.ts
   데이터 적재 검증 결과
 ========================================
 
-  ✓ 전체 데이터: 총 17,522행
+  ✓ 전체 데이터: 총 18,141행
   ✓ 탭: supply-chain: 6,482행
   ✓ 탭: vcm: 1,179행
   ✓ 탭: customer-detail: 10,431행
@@ -1138,3 +1236,27 @@ npx tsx scripts/seed-postgres.ts
 1. **하드 리프레시**: Cmd+Shift+R (Mac) / Ctrl+Shift+R (Windows)
 2. **dev 서버 재시작**: `Ctrl+C` 후 `npm run dev`
 3. **빌드 캐시 삭제**: `rm -rf .next && npm run dev`
+
+> **중요**: `sqlite3` CLI로 직접 INSERT한 데이터는 dev 서버에서 즉시 반영되지 않을 수 있습니다. `npm run seed`로 적재하거나, dev 서버를 재시작하세요.
+
+### VCM 내부Data 버튼이 안 보임
+
+```bash
+# Internal 데이터 존재 여부 확인
+sqlite3 data/dashboard.db "SELECT COUNT(*) FROM metrics WHERE tab='vcm' AND category='totalWaferYearly' AND customer='Internal';"
+# → 0이면 내부 데이터 적재 필요 (섹션 4-2 > 1b 참고)
+# → 적재 후 npm run seed 또는 dev 서버 재시작
+```
+
+---
+
+## 14. 유닛 테스트
+
+vitest로 핵심 유틸리티 함수를 테스트합니다.
+
+```bash
+npm test              # 전체 테스트 실행
+npm run test:watch    # watch 모드
+```
+
+테스트 파일: `src/lib/__tests__/format.test.ts` (28개 테스트)

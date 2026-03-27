@@ -13,6 +13,7 @@ import {
   NEWS_QUERIES_BY_CATEGORY,
   MOUNT_PER_UNIT_BY_CATEGORY,
   TOTAL_WAFER_YEARLY,
+  TOTAL_WAFER_YEARLY_INTERNAL,
   DEVICE_STACKED_YEARLY,
   APP_YEARLY_DEMANDS,
   DEVICE_STACKED_YEARLY_BY_APP,
@@ -113,7 +114,7 @@ function seedSupplyChain(): Row[] {
 
 // ── 2. VCM ───────────────────────────────────────────────────────────────────
 
-function seedVcm(): Row[] {
+function seedVcm(version: string, includeCommon = true): Row[] {
   const rows: Row[] = [];
 
   // Application demands (yearly)
@@ -128,7 +129,7 @@ function seedVcm(): Row[] {
           y.value,
           'units',
           y.isEstimate ? 1 : 0,
-          null,
+          version,
           JSON.stringify({ application: appKey }),
         ),
       );
@@ -147,7 +148,7 @@ function seedVcm(): Row[] {
           y.waferDemand,
           'K/M',
           y.isEstimate ? 1 : 0,
-          null,
+          version,
           JSON.stringify({ device: device.device }),
         ),
       );
@@ -166,7 +167,7 @@ function seedVcm(): Row[] {
           metric.value,
           metric.unit,
           0,
-          null,
+          version,
           JSON.stringify({ serverType: entry.serverType }),
         ),
       );
@@ -182,11 +183,11 @@ function seedVcm(): Row[] {
             'vcm',
             metric.year.toString(),
             entry.label,
-            'mountPerUnitByApp',
+            `mountPerUnitByApp_${appKey}`,
             metric.value,
             metric.unit,
             0,
-            null,
+            version,
             JSON.stringify({ application: appKey, serverType: entry.serverType }),
           ),
         );
@@ -205,51 +206,55 @@ function seedVcm(): Row[] {
         null,
         null,
         0,
-        null,
+        version,
         JSON.stringify({ title: news.title, summary: news.summary }),
       ),
     );
   }
 
-  // VCM versions
-  for (const version of VCM_VERSIONS) {
-    rows.push(
-      row(
-        'vcm',
-        version.date,
-        version.id,
-        'vcmVersion',
-        null,
-        null,
-        0,
-        null,
-        JSON.stringify({ label: version.label }),
-      ),
-    );
+  // VCM versions (공통 데이터 — version 없이, 한 번만 생성)
+  if (includeCommon) {
+    for (const v of VCM_VERSIONS) {
+      rows.push(
+        row(
+          'vcm',
+          v.date,
+          v.id,
+          'vcmVersion',
+          null,
+          null,
+          0,
+          null,
+          JSON.stringify({ label: v.label }),
+        ),
+      );
+    }
   }
 
-  // News queries by category
-  for (const [categoryKey, query] of Object.entries(NEWS_QUERIES_BY_CATEGORY)) {
-    rows.push(
-      row(
-        'vcm',
-        '_meta',
-        categoryKey,
-        'newsQueryByCategory',
-        null,
-        null,
-        0,
-        null,
-        JSON.stringify({ queryKo: query.queryKo, queryEn: query.queryEn }),
-      ),
-    );
+  // News queries by category (공통 데이터 — version 없이, 한 번만 생성)
+  if (includeCommon) {
+    for (const [categoryKey, query] of Object.entries(NEWS_QUERIES_BY_CATEGORY)) {
+      rows.push(
+        row(
+          'vcm',
+          '_meta',
+          categoryKey,
+          'newsQueryByCategory',
+          null,
+          null,
+          0,
+          null,
+          JSON.stringify({ queryKo: query.queryKo, queryEn: query.queryEn }),
+        ),
+      );
+    }
   }
 
   // Application table
   for (const entry of VCM_DATA.applicationTable) {
     for (const y of entry.yearly) {
       rows.push(
-        row('vcm', y.year.toString(), entry.application, 'applicationTable', y.value, 'units', y.isEstimate ? 1 : 0),
+        row('vcm', y.year.toString(), entry.application, 'applicationTable', y.value, 'units', y.isEstimate ? 1 : 0, version),
       );
     }
   }
@@ -263,11 +268,11 @@ function seedVcm(): Row[] {
             'vcm',
             metric.year.toString(),
             entry.label,
-            'mountPerUnitByCategory',
+            `mountPerUnitByCategory_${catKey}`,
             metric.value,
             metric.unit,
             0,
-            null,
+            version,
             JSON.stringify({ categoryType: catKey, serverType: entry.serverType }),
           ),
         );
@@ -275,21 +280,23 @@ function seedVcm(): Row[] {
     }
   }
 
-  // News queries (per app, from VCM_DATA.newsQueries)
-  for (const [appKey, query] of Object.entries(VCM_DATA.newsQueries)) {
-    rows.push(
-      row(
-        'vcm',
-        '_meta',
-        appKey,
-        'newsQuery',
-        null,
-        null,
-        0,
-        null,
-        JSON.stringify({ queryKo: query.queryKo, queryEn: query.queryEn }),
-      ),
-    );
+  // News queries (per app — 공통 데이터 — version 없이, 한 번만 생성)
+  if (includeCommon) {
+    for (const [appKey, query] of Object.entries(VCM_DATA.newsQueries)) {
+      rows.push(
+        row(
+          'vcm',
+          '_meta',
+          appKey,
+          'newsQuery',
+          null,
+          null,
+          0,
+          null,
+          JSON.stringify({ queryKo: query.queryKo, queryEn: query.queryEn }),
+        ),
+      );
+    }
   }
 
   return rows;
@@ -297,8 +304,9 @@ function seedVcm(): Row[] {
 
 // ── 2b. VCM Yearly ──────────────────────────────────────────────────────────
 
-function seedVcmYearly(): Row[] {
+function seedVcmYearly(version: string, factor: number): Row[] {
   const rows: Row[] = [];
+  const f = (v: number) => Math.round(v * factor);
 
   // 1. TOTAL_WAFER_YEARLY
   for (const entry of TOTAL_WAFER_YEARLY) {
@@ -308,11 +316,28 @@ function seedVcmYearly(): Row[] {
         entry.year.toString(),
         'Total',
         'totalWaferYearly',
-        entry.total,
+        f(entry.total),
         'K/M',
         entry.isEstimate ? 1 : 0,
-        null,
-        JSON.stringify({ pw: entry.pw, epi: entry.epi }),
+        version,
+        JSON.stringify({ pw: f(entry.pw), epi: f(entry.epi) }),
+      ),
+    );
+  }
+
+  // 1b. TOTAL_WAFER_YEARLY_INTERNAL
+  for (const entry of TOTAL_WAFER_YEARLY_INTERNAL) {
+    rows.push(
+      row(
+        'vcm',
+        entry.year.toString(),
+        'Internal',
+        'totalWaferYearly',
+        f(entry.total),
+        'K/M',
+        entry.isEstimate ? 1 : 0,
+        version,
+        JSON.stringify({ pw: f(entry.pw), epi: f(entry.epi) }),
       ),
     );
   }
@@ -328,11 +353,11 @@ function seedVcmYearly(): Row[] {
         null,
         'K/M',
         entry.isEstimate ? 1 : 0,
-        null,
+        version,
         JSON.stringify({
-          dram: entry.dram, hbm: entry.hbm, nand: entry.nand,
-          otherMemory: entry.otherMemory, logic: entry.logic,
-          analog: entry.analog, discrete: entry.discrete, sensor: entry.sensor,
+          dram: f(entry.dram), hbm: f(entry.hbm), nand: f(entry.nand),
+          otherMemory: f(entry.otherMemory), logic: f(entry.logic),
+          analog: f(entry.analog), discrete: f(entry.discrete), sensor: f(entry.sensor),
         }),
       ),
     );
@@ -347,9 +372,10 @@ function seedVcmYearly(): Row[] {
           v.year.toString(),
           appKey,
           'appYearlyDemand',
-          v.value,
+          f(v.value),
           'units',
           v.isEstimate ? 1 : 0,
+          version,
         ),
       );
     }
@@ -367,11 +393,11 @@ function seedVcmYearly(): Row[] {
           null,
           'K/M',
           entry.isEstimate ? 1 : 0,
-          null,
+          version,
           JSON.stringify({
-            dram: entry.dram, hbm: entry.hbm, nand: entry.nand,
-            otherMemory: entry.otherMemory, logic: entry.logic,
-            analog: entry.analog, discrete: entry.discrete, sensor: entry.sensor,
+            dram: f(entry.dram), hbm: f(entry.hbm), nand: f(entry.nand),
+            otherMemory: f(entry.otherMemory), logic: f(entry.logic),
+            analog: f(entry.analog), discrete: f(entry.discrete), sensor: f(entry.sensor),
           }),
         ),
       );
@@ -387,9 +413,10 @@ function seedVcmYearly(): Row[] {
           t.year.toString(),
           appKey,
           'totalWaferDemandByAppYearly',
-          t.total,
+          f(t.total),
           'K/M',
           t.isEstimate ? 1 : 0,
+          version,
         ),
       );
     }
@@ -405,10 +432,10 @@ function seedVcmYearly(): Row[] {
             metric.year.toString(),
             entry.label,
             'yearlyMountPerUnitByCategory',
-            metric.value,
+            f(metric.value),
             metric.unit,
             0,
-            null,
+            version,
             JSON.stringify({ categoryType: catKey, serverType: entry.serverType }),
           ),
         );
@@ -1037,17 +1064,27 @@ function main() {
   insertMany(scRows);
   console.log(` ${scRows.length} rows`);
 
-  // VCM
-  process.stdout.write('Seeding vcm...');
-  const vcmRows = seedVcm();
-  insertMany(vcmRows);
-  console.log(` ${vcmRows.length} rows`);
+  // VCM (2025-04: 원본)
+  process.stdout.write('Seeding vcm (2025-04)...');
+  const vcmRows1 = seedVcm('2025-04', true);
+  insertMany(vcmRows1);
+  console.log(` ${vcmRows1.length} rows`);
 
-  // VCM Yearly
-  process.stdout.write('Seeding vcm-yearly...');
-  const vcmYearlyRows = seedVcmYearly();
-  insertMany(vcmYearlyRows);
-  console.log(` ${vcmYearlyRows.length} rows`);
+  process.stdout.write('Seeding vcm-yearly (2025-04)...');
+  const vcmYearlyRows1 = seedVcmYearly('2025-04', 1.0);
+  insertMany(vcmYearlyRows1);
+  console.log(` ${vcmYearlyRows1.length} rows`);
+
+  // VCM (2025-10: 3% 상향 조정)
+  process.stdout.write('Seeding vcm (2025-10)...');
+  const vcmRows2 = seedVcm('2025-10', false);
+  insertMany(vcmRows2);
+  console.log(` ${vcmRows2.length} rows`);
+
+  process.stdout.write('Seeding vcm-yearly (2025-10)...');
+  const vcmYearlyRows2 = seedVcmYearly('2025-10', 1.03);
+  insertMany(vcmYearlyRows2);
+  console.log(` ${vcmYearlyRows2.length} rows`);
 
   // Customer Detail
   process.stdout.write('Seeding customer-detail...');
@@ -1079,7 +1116,7 @@ function main() {
   insertMany(mpRows);
   console.log(` ${mpRows.length} rows`);
 
-  const total = scRows.length + vcmRows.length + vcmYearlyRows.length + cdRows.length + imRows.length + fnRows.length + siRows.length + mpRows.length;
+  const total = scRows.length + vcmRows1.length + vcmYearlyRows1.length + vcmRows2.length + vcmYearlyRows2.length + cdRows.length + imRows.length + fnRows.length + siRows.length + mpRows.length;
   console.log(`Total: ${total} rows`);
 }
 

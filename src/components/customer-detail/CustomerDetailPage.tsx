@@ -13,9 +13,8 @@ import MonthlyMetricsChart from './MonthlyMetricsChart';
 import FinancialResultsTable from './FinancialResultsTable';
 import TranscriptSummary from './TranscriptSummary';
 import IndustryMetricsPanel from './IndustryMetricsPanel';
-
 export default function CustomerDetailPage() {
-  const { data: apiData, loading } = useCustomerDetailData();
+  const { data: apiData, loading, error: apiError } = useCustomerDetailData();
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDetailId>('SEC');
   const [quarterRange, setQuarterRange] = useState<4 | 8 | 12>(8);
   const [showNews, setShowNews] = useState(false);
@@ -55,10 +54,18 @@ export default function CustomerDetailPage() {
     data?.label,
   );
 
-  if (loading || !data) {
+  if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
+      </div>
+    );
+  }
+
+  if (apiError || !data) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <p className="text-sm text-red-500">데이터를 불러올 수 없습니다. {apiError}</p>
       </div>
     );
   }
@@ -214,6 +221,8 @@ export default function CustomerDetailPage() {
             customerType={data.type}
             customerId={selectedCustomer}
             industryMetrics={selectedCustomer === 'Total_Foundry' ? allFoundryMetrics : data.industryMetrics}
+            monthlyMetrics={data.monthlyMetrics}
+            customerLabel={data.label}
           />
           {data.estimateTrend && (
             <EstimateTrendChart data={data.estimateTrend} customerId={selectedCustomer} />

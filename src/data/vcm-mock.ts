@@ -942,6 +942,22 @@ export const TOTAL_WAFER_YEARLY: TotalWaferYearlyEntry[] = [
   { year: 2030, total: 1300, pw: 793, epi: 507, isEstimate: true },
 ];
 
+export const TOTAL_WAFER_YEARLY_INTERNAL: TotalWaferYearlyEntry[] = [
+  // 내부 전망 데이터 — 월평균 (K/M)
+  { year: 2019, total: 648, pw: 378, epi: 270, isEstimate: false },
+  { year: 2020, total: 670, pw: 390, epi: 280, isEstimate: false },
+  { year: 2021, total: 760, pw: 445, epi: 315, isEstimate: false },
+  { year: 2022, total: 695, pw: 405, epi: 290, isEstimate: false },
+  { year: 2023, total: 680, pw: 398, epi: 282, isEstimate: false },
+  { year: 2024, total: 810, pw: 472, epi: 338, isEstimate: false },
+  { year: 2025, total: 870, pw: 525, epi: 345, isEstimate: false },
+  { year: 2026, total: 930, pw: 558, epi: 372, isEstimate: true },
+  { year: 2027, total: 880, pw: 520, epi: 360, isEstimate: true },
+  { year: 2028, total: 990, pw: 594, epi: 396, isEstimate: true },
+  { year: 2029, total: 1150, pw: 700, epi: 450, isEstimate: true },
+  { year: 2030, total: 1350, pw: 823, epi: 527, isEstimate: true },
+];
+
 export const DEVICE_STACKED_YEARLY: DeviceStackedYearlyEntry[] = [
   { year: 2019, isEstimate: false, dram: 1420, hbm: 5,   nand: 1650, otherMemory: 320, logic: 1200, analog: 480, discrete: 580, sensor: 210 },
   { year: 2020, isEstimate: false, dram: 1380, hbm: 8,   nand: 1720, otherMemory: 340, logic: 1350, analog: 510, discrete: 610, sensor: 240 },

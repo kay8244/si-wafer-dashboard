@@ -13,6 +13,17 @@ import {
 } from 'recharts';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import type { MemoryPriceIndicatorData } from '@/hooks/useSupplyChainData';
+import {
+  pearsonCorrelation,
+  formatOverlayValue,
+  CHART_COLORS,
+  SELECTION_COLORS,
+  TIME_RANGES,
+  tightDomain,
+  type OverlayLine,
+  type TimeRange,
+} from '@/lib/chart-utils';
+import CorrelationBadges from '@/components/supply-chain/CorrelationBadges';
 
 const TABLE_MONTHS = 12;
 
@@ -23,28 +34,14 @@ interface MemoryPriceIndicator {
   data: { month: string; value: number }[];
 }
 
-const CHART_COLORS = ['#3B82F6', '#10B981', '#F59E0B'];
-const SELECTION_COLORS = [
-  'bg-blue-50 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/20 dark:ring-blue-700',
-  'bg-emerald-50 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-900/20 dark:ring-emerald-700',
-  'bg-amber-50 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:ring-amber-700',
-];
-
-type TimeRange = 6 | 12 | 24 | 36;
-const TIME_RANGES: { value: TimeRange; label: string }[] = [
-  { value: 6, label: '6M' },
-  { value: 12, label: '12M' },
-  { value: 24, label: '24M' },
-  { value: 36, label: '36M' },
-];
-
 // ── Component ──────────────────────────────────────────────────────────────
 
 interface Props {
   indicators: MemoryPriceIndicatorData[];
+  overlayData?: OverlayLine[];
 }
 
-export default function MemoryPriceIndicators({ indicators: indicatorData }: Props) {
+export default function MemoryPriceIndicators({ indicators: indicatorData, overlayData = [] }: Props) {
   const INDICATORS: MemoryPriceIndicator[] = indicatorData;
 
   // Derive months from the indicator data
@@ -83,7 +80,7 @@ export default function MemoryPriceIndicators({ indicators: indicatorData }: Pro
       else groups.push({ year: yr, count: 1 });
     }
     return groups;
-  }, []);
+  }, [tableMonths]);
 
   // Year boundary indices for vertical border
   const yearBoundaryIndices = useMemo(() => {
@@ -99,6 +96,16 @@ export default function MemoryPriceIndicators({ indicators: indicatorData }: Pro
   // Chart
   const chartMonths = ALL_MONTHS.slice(-timeRange);
   const selectedIndicators = INDICATORS.filter((ind) => selectedIds.includes(ind.id));
+
+  const filteredOverlay = useMemo(() => {
+    if (overlayData.length === 0) return [];
+    const monthSet = new Set(chartMonths);
+    return overlayData.map((ol) => ({
+      ...ol,
+      data: ol.data.filter((d) => monthSet.has(d.month)),
+    }));
+  }, [overlayData, chartMonths]);
+
   const chartData = useMemo(() => {
     return chartMonths.map((month) => {
       const entry: Record<string, unknown> = { month: month.slice(2) };
@@ -106,11 +113,46 @@ export default function MemoryPriceIndicators({ indicators: indicatorData }: Pro
         const point = ind.data.find((d) => d.month === month);
         entry[ind.id] = point?.value ?? 0;
       }
+      for (const ol of filteredOverlay) {
+        const point = ol.data.find((d) => d.month === month);
+        if (point) entry[`overlay_${ol.name}`] = point.value;
+      }
       return entry;
     });
-  }, [chartMonths, selectedIndicators]);
+  }, [chartMonths, selectedIndicators, filteredOverlay]);
 
-  const cellBorder = 'border border-gray-200 dark:border-gray-600';
+  // Tight domain for overlay right Y-axis (15% padding)
+  const overlayDomain = useMemo(() => {
+    if (filteredOverlay.length === 0) return undefined;
+    const vals = filteredOverlay.flatMap((ol) => ol.data.map((d) => d.value));
+    return tightDomain(vals);
+  }, [filteredOverlay]);
+
+  // Tight domain for left Y-axis (15% padding around data range, no negatives)
+  const leftDomain = useMemo(() => {
+    const vals = selectedIndicators.flatMap((ind) =>
+      ind.data.filter((d) => chartMonths.includes(d.month)).map((d) => d.value)
+    );
+    return tightDomain(vals, false);
+  }, [selectedIndicators, chartMonths]);
+
+  // Correlation: first selected indicator vs each overlay
+  const correlations = useMemo(() => {
+    if (filteredOverlay.length === 0 || selectedIndicators.length === 0) return [];
+    const ref = selectedIndicators[0];
+    const refByMonth = new Map(ref.data.map((d) => [d.month, d.value]));
+    const result: { name: string; r: number; color: string }[] = [];
+    for (const ol of filteredOverlay) {
+      const pairs: { x: number; y: number }[] = [];
+      for (const d of ol.data) {
+        const x = refByMonth.get(d.month);
+        if (x !== undefined) pairs.push({ x, y: d.value });
+      }
+      const r = pearsonCorrelation(pairs.map((p) => p.x), pairs.map((p) => p.y));
+      if (r !== null) result.push({ name: ol.name, r, color: ol.color });
+    }
+    return result;
+  }, [filteredOverlay, selectedIndicators]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -210,26 +252,48 @@ export default function MemoryPriceIndicators({ indicators: indicatorData }: Pro
               ))}
             </div>
           </div>
+          <div className="relative">
+          <CorrelationBadges correlations={correlations} isDark={isDark} />
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
               <XAxis dataKey="month" tick={{ fontSize: 10, fill: tickFill }} axisLine={false} tickLine={false} />
               <YAxis
+                yAxisId="left"
                 tick={{ fontSize: 10, fill: tickFill }}
                 axisLine={false}
                 tickLine={false}
+                domain={leftDomain}
                 label={{ value: 'Price ($)', angle: -90, position: 'insideLeft', offset: 10, fontSize: 10, fill: tickFill }}
               />
-              <Tooltip contentStyle={{
-                fontSize: 11, borderRadius: 8,
-                border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
-                backgroundColor: isDark ? '#1f2937' : '#ffffff',
-                color: isDark ? '#e5e7eb' : '#1f2937',
-              }} />
+              {filteredOverlay.length > 0 && (
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: tickFill }} axisLine={false} tickLine={false}
+                  domain={overlayDomain}
+                  tickFormatter={formatOverlayValue}
+                  label={{ value: '내부 데이터', angle: 90, position: 'insideRight', offset: 10, fontSize: 10, fill: tickFill }}
+                />
+              )}
+              <Tooltip
+                formatter={(value: number | undefined, name?: string) => {
+                  const v = value ?? 0;
+                  const n = name ?? '';
+                  if (n.startsWith('overlay_') || n.includes('(내부)')) {
+                    return [formatOverlayValue(v), n.replace('overlay_', '').replace(' (내부)', '') + ' (내부)'];
+                  }
+                  return [`$${v.toFixed(2)}`, n];
+                }}
+                contentStyle={{
+                  fontSize: 11, borderRadius: 8,
+                  border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
+                  backgroundColor: isDark ? '#1f2937' : '#ffffff',
+                  color: isDark ? '#e5e7eb' : '#1f2937',
+                }}
+              />
               <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
               {selectedIndicators.map((ind, i) => (
                 <Line
                   key={ind.id}
+                  yAxisId="left"
                   type="monotone"
                   dataKey={ind.id}
                   name={ind.name}
@@ -239,8 +303,23 @@ export default function MemoryPriceIndicators({ indicators: indicatorData }: Pro
                   activeDot={{ r: 4 }}
                 />
               ))}
+              {filteredOverlay.map((ol) => (
+                <Line
+                  key={`overlay_${ol.name}`}
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey={`overlay_${ol.name}`}
+                  name={`${ol.name} (내부)`}
+                  stroke={ol.color}
+                  strokeWidth={2}
+                  strokeDasharray="6 3"
+                  dot={{ r: 2, fill: ol.color }}
+                  activeDot={{ r: 4 }}
+                />
+              ))}
             </LineChart>
           </ResponsiveContainer>
+          </div>
         </div>
       )}
     </div>

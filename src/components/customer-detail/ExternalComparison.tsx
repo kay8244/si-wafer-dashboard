@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   ComposedChart,
   LineChart,
@@ -33,6 +33,8 @@ interface Props {
   customerType: 'memory' | 'foundry';
   customerId?: string;
   industryMetrics?: IndustryMetric[];
+  monthlyMetrics?: { month: string; waferInput: number; utilization: number; dramRatio?: number }[];
+  customerLabel?: string;
 }
 
 type QuarterRange = 4 | 8 | 12;
@@ -76,7 +78,7 @@ function getQuarterLabel(quarter: string): string {
   return match ? `${match[1]}Q` : quarter;
 }
 
-export default function ExternalComparison({ data, waferInOutData, bitGrowthData, quarterRange, onQuarterRangeChange, customerType, customerId, industryMetrics }: Props) {
+export default function ExternalComparison({ data, waferInOutData, bitGrowthData, quarterRange, onQuarterRangeChange, customerType, customerId, industryMetrics, monthlyMetrics, customerLabel }: Props) {
   const { data: scData } = useSupplyChainData();
   const { isDark } = useDarkMode();
   const tickFill = isDark ? '#94a3b8' : '#6b7280';
@@ -499,6 +501,100 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
     ? { fontSize: 11, borderRadius: 6, backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' }
     : { fontSize: 11, borderRadius: 6 };
 
+  // AI analysis state
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const aiLoadingRef = useRef(false);
+  const prevCustomerRef = useRef(customerId);
+
+  // Auto-refetch when customer or metric toggles change while panel is open
+  const prevCustomerRef2 = useRef(customerId);
+  const prevMetricsRef = useRef([...visibleMetrics].join(','));
+  useEffect(() => {
+    const metricsKey = [...visibleMetrics].join(',');
+    if (aiOpen && (customerId !== prevCustomerRef2.current || metricsKey !== prevMetricsRef.current)) {
+      setAiInsight(null);
+      fetchAiInsight();
+    }
+    prevCustomerRef2.current = customerId;
+    prevMetricsRef.current = metricsKey;
+  }, [customerId, visibleMetrics, aiOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchAiInsight = async () => {
+    if (aiOpen && aiInsight && !aiLoadingRef.current) { setAiOpen(false); return; }
+    if (aiLoadingRef.current) return;
+    setAiOpen(true);
+    setAiLoading(true);
+    aiLoadingRef.current = true;
+    setAiInsight(null);
+    try {
+      const hasDramRatio = waferInOutData.some((d) => d.dramRatio !== undefined);
+      const recent = filteredData.slice(-8);
+      const showingIn = visibleMetrics.has('waferIn');
+      const showingOut = visibleMetrics.has('waferOut');
+
+      // Build concise data summary
+      const sections: string[] = [];
+      if (showingIn) {
+        const first = recent[0];
+        const last = recent[recent.length - 1];
+        sections.push(`Wafer In: ${first?.quarter} ${first?.waferIn} → ${last?.quarter} ${last?.waferIn}`);
+        if (hasDramRatio) {
+          sections.push(`  DRAM In: ${first?.waferInDram} → ${last?.waferInDram}`);
+          sections.push(`  NAND In: ${first?.waferInNand} → ${last?.waferInNand}`);
+        }
+      }
+      if (showingOut) {
+        const first = recent[0];
+        const last = recent[recent.length - 1];
+        sections.push(`Wafer Out: ${first?.quarter} ${first?.waferOut} → ${last?.quarter} ${last?.waferOut}`);
+        if (hasDramRatio) {
+          sections.push(`  DRAM Out: ${first?.waferOutDram} → ${last?.waferOutDram}`);
+          sections.push(`  NAND Out: ${first?.waferOutNand} → ${last?.waferOutNand}`);
+        }
+      }
+
+      const monthlyRecent = (monthlyMetrics ?? []).slice(-6);
+      if (monthlyRecent.length > 0) {
+        const mFirst = monthlyRecent[0];
+        const mLast = monthlyRecent[monthlyRecent.length - 1];
+        sections.push(`웨이퍼 주요지표 투입량(K/M): ${mFirst.month} ${mFirst.waferInput}K/M → ${mLast.month} ${mLast.waferInput}K/M, 가동률 ${mLast.utilization}%`);
+      }
+
+      const thisQ = `Q${Math.ceil((new Date().getMonth() + 1) / 3)}'${String(new Date().getFullYear()).slice(2)}`;
+      const yearEnd = `Q4'${String(new Date().getFullYear()).slice(2)}`;
+
+      const analysisParts: string[] = [];
+      let n = 1;
+      if (showingIn && hasDramRatio) analysisParts.push(`${n++}. DRAM Wafer In과 NAND Wafer In 추이 (증감률 위주, 간결하게)`);
+      else if (showingIn) analysisParts.push(`${n++}. Wafer In 추이 (증감률 위주, 간결하게)`);
+      if (showingOut && hasDramRatio) analysisParts.push(`${n++}. DRAM Wafer Out과 NAND Wafer Out 추이 (증감률 위주, 간결하게)`);
+      else if (showingOut) analysisParts.push(`${n++}. Wafer Out 추이 (증감률 위주, 간결하게)`);
+      if (showingIn) analysisParts.push(`${n++}. 주요지표 투입량(K/M)과 Wafer In(K/M) 차이 비교 + ${thisQ}~${yearEnd} 향후 변화 방향 (1줄)`);
+      analysisParts.push(`${n++}. 다음분기~금년 말(${yearEnd}) 전망 핵심 (1줄)`);
+
+      const context = `[${customerLabel ?? customerId} Wafer 분석]
+단위: 모든 수치는 K/M(천장/월). 와트/와플 등 다른 단위 사용 금지.
+
+${sections.join('\n')}
+
+분석 요청:
+${analysisParts.join('\n')}
+규칙: 실데이터 값 나열 금지. 증감률/추세 위주 간결하게. 총 6줄 이내. 단위는 K/M만 사용.`;
+
+      const res = await fetch('/api/ai-insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tab: 'customer-wafer', context }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const resData = await res.json();
+      if (resData.success && resData.insight) setAiInsight(resData.insight);
+    } catch { /* ignore */ }
+    finally { setAiLoading(false); aiLoadingRef.current = false; }
+  };
+
   const showIn = visibleMetrics.has('waferIn');
   const showOut = visibleMetrics.has('waferOut');
   const showUbsGrowth = visibleMetrics.has('ubsGrowth');
@@ -512,6 +608,15 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">Wafer In/Out, B/G</h3>
         <div className="flex items-center gap-1">
+          <button
+            onClick={fetchAiInsight}
+            disabled={aiLoading}
+            className={`rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+              aiOpen ? 'bg-indigo-500 text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+            }`}
+          >
+            {aiLoading ? '분석 중...' : '데이터분석'}
+          </button>
           {TIME_PRESETS.map((preset) => (
             <button
               key={preset.value}
@@ -1106,6 +1211,42 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
               )}
             </tbody>
           </table>
+        </div>
+      )}
+      {/* AI Analysis */}
+      {aiOpen && (
+        <div className="mt-3 rounded-lg border border-gray-200 bg-slate-50/80 p-3 dark:border-gray-700 dark:bg-slate-800/40">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-bold text-indigo-500 dark:text-indigo-400">AI Wafer In/Out 분석</span>
+            <button onClick={() => setAiOpen(false)} className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">닫기</button>
+          </div>
+          {aiLoading && !aiInsight && (
+            <div className="animate-pulse space-y-2">
+              <div className="h-3.5 w-5/6 rounded bg-gray-200 dark:bg-gray-700" />
+              <div className="h-3.5 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
+              <div className="h-3.5 w-4/6 rounded bg-gray-200 dark:bg-gray-700" />
+            </div>
+          )}
+          {aiInsight && (
+            <ul className="space-y-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+              {aiInsight.split('\n').filter(Boolean).map((line, i) => {
+                if (line.startsWith('●')) {
+                  return (
+                    <li key={i} className="flex items-start gap-1.5 mt-2 first:mt-0">
+                      <span className="mt-0.5 shrink-0 text-gray-500 dark:text-gray-400">●</span>
+                      <span className="text-[13px] font-semibold text-gray-800 dark:text-gray-200">{line.replace(/^●\s*/, '')}</span>
+                    </li>
+                  );
+                }
+                return (
+                  <li key={i} className="flex items-start gap-1.5 pl-4">
+                    <span className="mt-1 shrink-0 text-gray-400">•</span>
+                    <span className="text-[12px]">{line.replace(/^-\s*/, '')}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       )}
     </div>

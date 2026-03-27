@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { MetricRow } from '@/lib/db';
-import { queryAll } from '@/lib/db';
+import { parseMeta, queryAll } from '@/lib/db';
 import type {
   VcmData,
   VcmVersion,
@@ -17,17 +17,26 @@ import type {
   YearlyValue,
 } from '@/types/indicators';
 
-function parseMeta<T>(row: MetricRow): T {
+export async function GET(request: Request) {
   try {
-    return JSON.parse(row.metadata ?? '{}') as T;
-  } catch {
-    return {} as T;
-  }
-}
-
-export async function GET() {
   const TAB = 'vcm';
-  const rows = await queryAll(TAB);
+  const { searchParams } = new URL(request.url);
+  const versionParam = searchParams.get('version');
+
+  const allRows = await queryAll(TAB);
+
+  // version 미지정 시 첫 번째 버전을 기본값으로 사용 (중복 key 방지)
+  let effectiveVersion = versionParam;
+  if (!effectiveVersion) {
+    const firstVersionRow = allRows.find((r) => r.category === 'vcmVersion');
+    effectiveVersion = firstVersionRow?.customer ?? null;
+  }
+  let rows: MetricRow[];
+  if (effectiveVersion) {
+    rows = allRows.filter((r) => r.version === effectiveVersion || r.version === null);
+  } else {
+    rows = allRows;
+  }
 
   // ── Group rows by category ─────────────────────────────────────────────────
   const byCategory: Record<string, MetricRow[]> = {};
@@ -90,7 +99,6 @@ export async function GET() {
   // category='mountPerUnit', customer=label, version=serverType('traditional'|'ai'),
   // date=year, value=value, unit=unit, metadata={serverType}
   const mountRows = byCategory['mountPerUnit'] ?? [];
-  interface MountKey { serverType: string; label: string }
   const mountMap: Map<string, { serverType: MountPerUnit['serverType']; label: string; metrics: { year: number; value: number; unit: string }[] }> = new Map();
   for (const r of mountRows) {
     const meta = parseMeta<{ serverType?: string }>(r);
@@ -231,17 +239,25 @@ export async function GET() {
   // ── totalWaferYearly ─────────────────────────────────────────────────────
   // category='totalWaferYearly', customer='Total', date=year, value=total, metadata={pw, epi}
   const twYearlyRows = byCategory['totalWaferYearly'] ?? [];
+  const parseTwRow = (r: MetricRow) => {
+    const meta = parseMeta<{ pw?: number; epi?: number }>(r);
+    return {
+      year: parseInt(r.date, 10),
+      total: r.value ?? 0,
+      pw: meta.pw ?? 0,
+      epi: meta.epi ?? 0,
+      isEstimate: r.is_estimate === 1,
+    };
+  };
   const totalWaferYearly: TotalWaferYearlyEntry[] = twYearlyRows
-    .map((r) => {
-      const meta = parseMeta<{ pw?: number; epi?: number }>(r);
-      return {
-        year: parseInt(r.date, 10),
-        total: r.value ?? 0,
-        pw: meta.pw ?? 0,
-        epi: meta.epi ?? 0,
-        isEstimate: r.is_estimate === 1,
-      };
-    })
+    .filter((r) => r.customer !== 'Internal')
+    .map(parseTwRow)
+    .sort((a, b) => a.year - b.year);
+
+  // ── totalWaferYearlyInternal ─────────────────────────────────────────────
+  const totalWaferYearlyInternal: TotalWaferYearlyEntry[] = twYearlyRows
+    .filter((r) => r.customer === 'Internal')
+    .map(parseTwRow)
     .sort((a, b) => a.year - b.year);
 
   // ── deviceStackedYearly ────────────────────────────────────────────────
@@ -358,8 +374,14 @@ export async function GET() {
     mountPerUnitByCategory,
     yearlyMountPerUnitByCategory,
     totalWaferYearly,
+    totalWaferYearlyInternal,
     deviceStackedYearly,
     appYearlyDemands,
     deviceStackedYearlyByApp,
+    selectedVersion: versionParam ?? null,
   });
+  } catch (err) {
+    console.error('[vcm] GET error:', err);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
 }

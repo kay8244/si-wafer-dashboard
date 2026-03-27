@@ -19,6 +19,14 @@ export interface MetricRow {
   metadata: string | null;
 }
 
+export function parseMeta<T>(row: MetricRow): T {
+  try {
+    return JSON.parse(row.metadata ?? '{}') as T;
+  } catch {
+    return {} as T;
+  }
+}
+
 export function getPostgresUrl(): string | undefined {
   return process.env.POSTGRES_URL || process.env.DATABASE_URL || undefined;
 }
@@ -29,48 +37,52 @@ export function isPostgres(): boolean {
 
 // ── SQLite (local) ─────────────────────────────────────────────────────────────
 
-let _db: import('better-sqlite3').Database | null = null;
+let _seedDb: import('better-sqlite3').Database | null = null;
 
 function getSqliteDb(): import('better-sqlite3').Database {
-  if (!_db) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3') as typeof import('better-sqlite3');
-    _db = new Database(DB_PATH);
-    _db.pragma('journal_mode = WAL');
-    _db.exec(`
-      CREATE TABLE IF NOT EXISTS metrics (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tab TEXT NOT NULL,
-        date TEXT NOT NULL,
-        customer TEXT NOT NULL,
-        category TEXT NOT NULL,
-        value REAL,
-        unit TEXT,
-        is_estimate INTEGER DEFAULT 0,
-        version TEXT,
-        metadata TEXT
-      );
-      CREATE INDEX IF NOT EXISTS idx_tab ON metrics(tab);
-      CREATE INDEX IF NOT EXISTS idx_tab_customer ON metrics(tab, customer);
-      CREATE INDEX IF NOT EXISTS idx_tab_date ON metrics(tab, date);
-      CREATE INDEX IF NOT EXISTS idx_tab_cat ON metrics(tab, category);
-    `);
-  }
-  return _db;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Database = require('better-sqlite3') as typeof import('better-sqlite3');
+  // Compute path at call time (not module load time) to avoid Turbopack caching issues
+  const dbPath = require('path').join(process.cwd(), 'data', 'dashboard.db');
+  const db = new Database(dbPath);
+  return db;
 }
 
-/** Legacy accessor kept for scripts/seed.ts which uses it directly */
+/** Ensure table+indexes exist (called by seed scripts only) */
+export function ensureSchema(db: import('better-sqlite3').Database): void {
+  db.pragma('journal_mode = WAL');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS metrics (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tab TEXT NOT NULL,
+      date TEXT NOT NULL,
+      customer TEXT NOT NULL,
+      category TEXT NOT NULL,
+      value REAL,
+      unit TEXT,
+      is_estimate INTEGER DEFAULT 0,
+      version TEXT,
+      metadata TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_tab ON metrics(tab);
+    CREATE INDEX IF NOT EXISTS idx_tab_customer ON metrics(tab, customer);
+    CREATE INDEX IF NOT EXISTS idx_tab_date ON metrics(tab, date);
+    CREATE INDEX IF NOT EXISTS idx_tab_cat ON metrics(tab, category);
+  `);
+}
+
+/** Accessor for scripts/seed.ts — returns a persistent connection with schema ensured */
 export function getDb(): import('better-sqlite3').Database {
-  return getSqliteDb();
+  if (!_seedDb) {
+    _seedDb = getSqliteDb();
+    ensureSchema(_seedDb);
+  }
+  return _seedDb;
 }
 
 // ── Postgres helpers ───────────────────────────────────────────────────────────
 
 async function pgQueryRaw(query: string, values: (string | number | null)[]): Promise<MetricRow[]> {
-  const { sql } = await import('@vercel/postgres');
-  // Build a tagged-template-compatible call by using the underlying query method
-  // @vercel/postgres exposes a `query` function via createPool or we can use the sql
-  // tagged template. Since we need dynamic queries, we use the pool query directly.
   const { db } = await import('@vercel/postgres');
   const result = await db.query(query, values);
   return result.rows as MetricRow[];
@@ -114,8 +126,12 @@ export async function queryAll(tab: string): Promise<MetricRow[]> {
   }
   const db = getSqliteDb();
   try {
-    return db.prepare('SELECT * FROM metrics WHERE tab = ? ORDER BY id ASC').all(tab) as MetricRow[];
-  } catch {
+    const rows = db.prepare('SELECT * FROM metrics WHERE tab = ? ORDER BY id ASC').all(tab) as MetricRow[];
+    db.close();
+    return rows;
+  } catch (err) {
+    console.warn('[db] queryAll failed:', err);
+    db.close();
     return [];
   }
 }
@@ -135,7 +151,8 @@ export async function queryMetricsLike(tab: string, categoryPrefix: string): Pro
     return db
       .prepare('SELECT * FROM metrics WHERE tab = ? AND category LIKE ?')
       .all(tab, `${categoryPrefix}%`) as MetricRow[];
-  } catch {
+  } catch (err) {
+    console.warn('[db] queryMetricsLike failed:', err);
     return [];
   }
 }
@@ -158,7 +175,8 @@ export async function queryMetricsIn(tab: string, categories: string[]): Promise
     return db
       .prepare(`SELECT * FROM metrics WHERE tab = ? AND category IN (${placeholders})`)
       .all(tab, ...categories) as MetricRow[];
-  } catch {
+  } catch (err) {
+    console.warn('[db] queryMetricsIn failed:', err);
     return [];
   }
 }
@@ -186,7 +204,8 @@ export async function queryByCustomer(tab: string, customerId?: string): Promise
     return db
       .prepare('SELECT * FROM metrics WHERE tab = ? ORDER BY id ASC')
       .all(tab) as MetricRow[];
-  } catch {
+  } catch (err) {
+    console.warn('[db] queryByCustomer failed:', err);
     return [];
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   LineChart,
   Line,
@@ -14,26 +14,11 @@ import {
 } from 'recharts';
 import { SupplyChainCategory, ViewMode, LeadingIndicatorRating } from '@/types/indicators';
 import { useDarkMode } from '@/hooks/useDarkMode';
-
-function leadingRatingBadge(r: LeadingIndicatorRating): { bg: string; text: string } {
-  switch (r) {
-    case '상': return { bg: 'bg-green-100', text: 'text-green-800' };
-    case '중상': return { bg: 'bg-emerald-50', text: 'text-emerald-700' };
-    case '중': return { bg: 'bg-yellow-100', text: 'text-yellow-800' };
-    case '중하': return { bg: 'bg-orange-100', text: 'text-orange-700' };
-    case '하': return { bg: 'bg-red-100', text: 'text-red-800' };
-    default: return { bg: 'bg-gray-100', text: 'text-gray-600' };
-  }
-}
+import { OverlayLine, pearsonCorrelation, tightDomain, Correlation } from '@/lib/chart-utils';
+import CorrelationBadges from '@/components/supply-chain/CorrelationBadges';
 
 type TimeRange = 6 | 12 | 24 | 36;
 const TIME_RANGES: TimeRange[] = [6, 12, 24, 36];
-
-interface OverlayLine {
-  name: string;
-  data: { month: string; value: number }[];
-  color: string;
-}
 
 interface IndicatorChartProps {
   category: SupplyChainCategory;
@@ -49,15 +34,6 @@ const SELECTED_INDICATOR_COLORS = ['#3B82F6', '#10B981', '#F59E0B'];
 
 const INDICATOR_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#db2777'];
 
-/** Map viewMode to a display label and line color */
-const VIEW_MODE_LINE: Record<ViewMode, { label: string; color: string }> = {
-  actual: { label: 'Actual', color: '#2563eb' },
-  threeMonthMA: { label: '3MMA', color: '#16a34a' },
-  twelveMonthMA: { label: '12MMA', color: '#d97706' },
-  mom: { label: 'MoM', color: '#dc2626' },
-  yoy: { label: 'YoY', color: '#7c3aed' },
-};
-
 function getFieldValue(
   m: { actual: number; threeMonthMA: number; twelveMonthMA: number; mom: number; yoy: number },
   viewMode: ViewMode,
@@ -69,50 +45,6 @@ function getFieldValue(
     case 'mom': return m.mom;
     case 'yoy': return m.yoy;
   }
-}
-
-/** Compute a tight [min, max] domain with ~15% padding so variation is clearly visible */
-function tightDomain(values: number[]): [number, number] {
-  if (values.length === 0) return [0, 1];
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min;
-  if (range === 0) {
-    // Flat line — show ±10% of the value
-    const pad = Math.abs(min) * 0.1 || 1;
-    return [min - pad, max + pad];
-  }
-  const padding = range * 0.15;
-  const lo = min - padding;
-  return [lo < 0 && min >= 0 ? 0 : lo, max + padding];
-}
-
-/** Pearson correlation coefficient between two numeric arrays of equal length */
-function pearsonCorrelation(x: number[], y: number[]): number | null {
-  const n = x.length;
-  if (n < 3 || n !== y.length) return null;
-  const meanX = x.reduce((a, b) => a + b, 0) / n;
-  const meanY = y.reduce((a, b) => a + b, 0) / n;
-  let num = 0, denX = 0, denY = 0;
-  for (let i = 0; i < n; i++) {
-    const dx = x[i] - meanX;
-    const dy = y[i] - meanY;
-    num += dx * dy;
-    denX += dx * dx;
-    denY += dy * dy;
-  }
-  const den = Math.sqrt(denX * denY);
-  if (den === 0) return null;
-  return num / den;
-}
-
-/** Interpret correlation strength */
-function corrLabel(r: number): { text: string; color: string } {
-  const abs = Math.abs(r);
-  if (abs >= 0.8) return { text: '강한', color: r > 0 ? '#dc2626' : '#2563eb' };
-  if (abs >= 0.6) return { text: '보통', color: r > 0 ? '#d97706' : '#7c3aed' };
-  if (abs >= 0.4) return { text: '약한', color: '#6b7280' };
-  return { text: '미약', color: '#9ca3af' };
 }
 
 /** Format Y-axis values compactly */
@@ -145,6 +77,132 @@ export default function IndicatorChart({
   const xAxisInterval = Math.max(0, Math.floor(timeRange / 12) - 1);
   const xTickFontSize = timeRange <= 12 ? 14 : 12;
   const showValueLabels = timeRange <= 12;
+
+  // AI insight state
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const aiLoadingRef = useRef(false);
+
+  const fetchAiInsight = async (force = false) => {
+    if (!force) {
+      if (aiInsight && !aiLoadingRef.current && !aiOpen) { setAiOpen(true); return; }
+      if (aiOpen && aiInsight && !aiLoadingRef.current) { setAiOpen(false); return; }
+    }
+    if (aiLoadingRef.current) return;
+    const allInds = (allCategories ?? [category]).flatMap((c) => c.indicators);
+    const selected = selectedIndicatorIds.map((name) => allInds.find((ind) => ind.name === name)).filter(Boolean);
+    if (selected.length === 0) return;
+
+    setAiOpen(true);
+    setAiLoading(true);
+    aiLoadingRef.current = true;
+    setAiInsight(null);
+    try {
+      const indLines = selected.map((ind) => {
+        const recent = ind!.monthly.slice(-12);
+        const vals = recent.map((m) => `${m.month}=${m.actual}`).join(', ');
+        const first = recent[0]?.actual ?? 0;
+        const last = recent[recent.length - 1]?.actual ?? 0;
+        const prev = recent.length >= 2 ? recent[recent.length - 2]?.actual ?? 0 : 0;
+        const yoyDiff = first !== 0 ? (((last - first) / Math.abs(first)) * 100).toFixed(1) : '-';
+        const momDiff = prev !== 0 ? (((last - prev) / Math.abs(prev)) * 100).toFixed(2) : '-';
+        const momAbs = prev !== 0 ? (last - prev).toFixed(2) : '-';
+        return `[${ind!.name}] (${ind!.unit}) 최근12개월: ${vals} | 12개월변동: ${yoyDiff}% | 전월대비: ${momAbs} (${momDiff}%)`;
+      });
+      // Internal overlay data — each gets its own analysis entry
+      const overlayLines = (overlayData ?? []).map((o) => {
+        const recent = o.data.slice(-12);
+        const vals = recent.map((d) => `${d.month}=${d.value}`).join(', ');
+        const first = recent[0]?.value ?? 0;
+        const last = recent[recent.length - 1]?.value ?? 0;
+        const prev = recent.length >= 2 ? recent[recent.length - 2]?.value ?? 0 : 0;
+        const yoyDiff = first !== 0 ? (((last - first) / Math.abs(first)) * 100).toFixed(1) : '-';
+        const momDiff = prev !== 0 ? (((last - prev) / Math.abs(prev)) * 100).toFixed(2) : '-';
+        const momAbs = prev !== 0 ? (last - prev).toFixed(0) : '-';
+        return `[내부데이터: ${o.name}] 최근12개월: ${vals} | 12개월변동: ${yoyDiff}% | 전월대비: ${momAbs} (${momDiff}%)`;
+      });
+      // Cross-correlation: every external indicator × every internal overlay, sorted by |r|
+      const corrEntries: { label: string; r: number }[] = [];
+      if (selected.length >= 1 && overlayData && overlayData.length > 0) {
+        for (const ind of selected) {
+          const indMap = new Map(ind!.monthly.map((m) => [m.month, m.actual]));
+          for (const ol of overlayData) {
+            const pairs: { x: number; y: number }[] = [];
+            for (const d of ol.data) { const x = indMap.get(d.month); if (x !== undefined) pairs.push({ x, y: d.value }); }
+            const r = pearsonCorrelation(pairs.map((p) => p.x), pairs.map((p) => p.y));
+            if (r !== null) corrEntries.push({ label: `${ind!.name} ↔ ${ol.name}`, r });
+          }
+        }
+      }
+      corrEntries.sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+      const corrLines = corrEntries.map((c) => `${c.label}: r=${c.r >= 0 ? '+' : ''}${c.r.toFixed(2)}`);
+      const context = `외부 지표:\n${indLines.join('\n')}${overlayLines.length > 0 ? `\n\n내부 데이터:\n${overlayLines.join('\n')}` : ''}${corrLines.length > 0 ? `\n\n상관계수 (|r| 높은순):\n${corrLines.join('\n')}` : ''}`;
+      const res = await fetch('/api/ai-insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tab: 'supply-chain', context }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.success && data.insight) setAiInsight(data.insight);
+    } catch { /* ignore */ }
+    finally { setAiLoading(false); aiLoadingRef.current = false; }
+  };
+
+  // Auto-refetch when indicators/overlay change while panel is open
+  const prevIdsRef = useRef(selectedIndicatorIds.join(','));
+  const prevOverlayRef = useRef((overlayData ?? []).map((o) => o.name).join(','));
+  useEffect(() => {
+    const idsKey = selectedIndicatorIds.join(',');
+    const overlayKey = (overlayData ?? []).map((o) => o.name).join(',');
+    if (aiOpen && (idsKey !== prevIdsRef.current || overlayKey !== prevOverlayRef.current)) {
+      setAiInsight(null);
+      fetchAiInsight(true);
+    }
+    prevIdsRef.current = idsKey;
+    prevOverlayRef.current = overlayKey;
+  }, [selectedIndicatorIds, overlayData, aiOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const AiButton = (
+    <button
+      onClick={() => fetchAiInsight()}
+      disabled={aiLoading || selectedIndicatorIds.length === 0}
+      className={`rounded-md px-2.5 py-1.5 text-[10px] font-semibold transition-colors ${
+        aiOpen
+          ? 'bg-indigo-500 text-white shadow-sm'
+          : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+      }`}
+    >
+      {aiLoading ? '분석 중...' : '데이터분석'}
+    </button>
+  );
+
+  const AiResult = aiOpen ? (
+    <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 dark:border-indigo-800 dark:bg-indigo-900/20">
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">AI 데이터 분석</span>
+        <button onClick={() => setAiOpen(false)} className="text-xs text-gray-400 hover:text-gray-600">닫기</button>
+      </div>
+      {aiLoading && !aiInsight && (
+        <div className="animate-pulse space-y-1.5">
+          <div className="h-2.5 w-5/6 rounded bg-indigo-200/50 dark:bg-indigo-700/30" />
+          <div className="h-2.5 w-4/6 rounded bg-indigo-200/50 dark:bg-indigo-700/30" />
+          <div className="h-2.5 w-3/6 rounded bg-indigo-200/50 dark:bg-indigo-700/30" />
+        </div>
+      )}
+      {aiInsight && (
+        <div className="space-y-1 leading-relaxed text-gray-700 dark:text-gray-300">
+          {aiInsight.split('\n').filter(Boolean).map((line, i) => {
+            if (line.startsWith('●')) {
+              return <p key={i} className="text-[15px] font-semibold mt-2.5 first:mt-0">{line}</p>;
+            }
+            return <p key={i} className="text-[13px] pl-3">{line}</p>;
+          })}
+        </div>
+      )}
+    </div>
+  ) : null;
 
   // Time range selector component
   const TimeRangeSelector = (
@@ -197,16 +255,16 @@ export default function IndicatorChart({
     // Y-axis domains per indicator (independent scales)
     const indDomains = selectedInds.map((ind) => {
       const vals = ind.monthly.slice(-timeRange).map((m) => getFieldValue(m, viewMode));
-      return tightDomain(vals);
+      return tightDomain(vals) ?? [0, 1];
     });
 
     // Right Y domain — overlay values
     const monthSet = new Set(refMonths);
     const allRightValues = overlayData?.flatMap((ol) => ol.data.filter((d) => monthSet.has(d.month)).map((d) => d.value)) ?? [];
-    const rightDomain = tightDomain(allRightValues);
+    const rightDomain = tightDomain(allRightValues) ?? [0, 1];
 
     // Correlation badges (first indicator vs overlays)
-    const correlations: { name: string; r: number; color: string }[] = [];
+    const correlations: Correlation[] = [];
     if (overlayData && overlayData.length > 0 && selectedInds.length > 0) {
       const extByMonth = new Map(refMonthly.map((m) => [m.month, getFieldValue(m, viewMode)]));
       overlayData.forEach((ol) => {
@@ -226,7 +284,7 @@ export default function IndicatorChart({
     // ind[2] → 'ind2' (hidden axis — tooltip only)
     // overlays → 'overlay' (right axis when no 2nd indicator, else hidden)
     const getIndAxisId = (idx: number) => `ind${idx}`;
-    const overlayAxisId = selectedInds.length <= 1 ? 'overlay' : 'ind1';
+    const overlayAxisId = 'overlay';
 
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-md">
@@ -257,33 +315,15 @@ export default function IndicatorChart({
               <span className="text-sm font-normal text-gray-400 ml-1">| 오른쪽 축: 내부 데이터</span>
             )}
           </div>
-          {TimeRangeSelector}
+          <div className="flex items-center gap-2">
+            {AiButton}
+            {TimeRangeSelector}
+          </div>
         </div>
 
         <div className="relative">
           {/* Correlation badges */}
-          {correlations.length > 0 && (
-            <div className="absolute top-7 right-24 z-10 flex flex-col gap-1">
-              {correlations.map((c) => {
-                const info = corrLabel(c.r);
-                return (
-                  <div
-                    key={c.name}
-                    className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold shadow-sm backdrop-blur-sm"
-                    style={{
-                      borderColor: c.color + '40',
-                      backgroundColor: isDark ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.9)',
-                    }}
-                  >
-                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color }} />
-                    <span style={{ color: isDark ? '#e2e8f0' : '#374151' }}>{c.name.split(' (')[0]}</span>
-                    <span style={{ color: info.color, fontWeight: 700 }}>r={c.r >= 0 ? '+' : ''}{c.r.toFixed(2)}</span>
-                    <span style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>({info.text} {c.r >= 0 ? '양' : '음'}의 상관)</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <CorrelationBadges correlations={correlations} isDark={isDark} />
 
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 4 }}>
@@ -300,8 +340,8 @@ export default function IndicatorChart({
                 stroke={SELECTED_INDICATOR_COLORS[0]}
               />
 
-              {/* Right Y — second indicator or overlay */}
-              {selectedInds.length >= 2 ? (
+              {/* Right Y — second indicator (visible) */}
+              {selectedInds.length >= 2 && (
                 <YAxis
                   yAxisId="ind1"
                   orientation="right"
@@ -311,24 +351,28 @@ export default function IndicatorChart({
                   tickFormatter={formatYValue}
                   stroke={SELECTED_INDICATOR_COLORS[1]}
                 />
-              ) : hasOverlay ? (
-                <YAxis
-                  yAxisId="overlay"
-                  orientation="right"
-                  tick={{ fontSize: 13, fill: tickColor }}
-                  width={60}
-                  domain={rightDomain}
-                  tickFormatter={formatYValue}
-                  stroke="#9ca3af"
-                />
-              ) : null}
+              )}
 
-              {/* Hidden Y axis for 3rd indicator (tooltip only) */}
+              {/* Hidden Y axis for 3rd indicator */}
               {selectedInds.length >= 3 && (
                 <YAxis
                   yAxisId="ind2"
                   hide
                   domain={indDomains[2]}
+                />
+              )}
+
+              {/* Overlay Y axis — always independent, hidden when other right axes exist */}
+              {hasOverlay && (
+                <YAxis
+                  yAxisId="overlay"
+                  orientation="right"
+                  hide={selectedInds.length >= 2}
+                  tick={{ fontSize: 13, fill: tickColor }}
+                  width={selectedInds.length >= 2 ? 0 : 60}
+                  domain={rightDomain}
+                  tickFormatter={formatYValue}
+                  stroke="#9ca3af"
                 />
               )}
 
@@ -382,6 +426,7 @@ export default function IndicatorChart({
             </LineChart>
           </ResponsiveContainer>
         </div>
+        {AiResult}
       </div>
     );
   }
@@ -409,12 +454,12 @@ export default function IndicatorChart({
   const allLeftValues = category.indicators.flatMap((ind) =>
     ind.monthly.slice(-timeRange).map((m) => getFieldValue(m, viewMode)),
   );
-  const leftDomain = tightDomain(allLeftValues);
+  const leftDomain = tightDomain(allLeftValues) ?? [0, 1];
 
   // Right Y domain — overlay values (filtered to time range)
   const monthSet = new Set(months);
   const allRightValues = overlayData?.flatMap((ol) => ol.data.filter((d) => monthSet.has(d.month)).map((d) => d.value)) ?? [];
-  const rightDomain = tightDomain(allRightValues);
+  const rightDomain = tightDomain(allRightValues) ?? [0, 1];
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-md">

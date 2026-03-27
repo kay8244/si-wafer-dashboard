@@ -95,7 +95,7 @@ async function generateSummary(
   const cacheKey = buildSummaryCacheKey(companyName, articles);
   const cached = await getCached<string>(cacheKey);
   if (cached) {
-    console.log(`[News] Cache hit for ${companyName} summary`);
+    // cache hit
     return cached;
   }
 
@@ -154,7 +154,7 @@ ${articleList}
     // 요약 결과 캐시 저장 (24시간 TTL)
     if (summary) {
       await setCache(cacheKey, summary);
-      console.log(`[News] Cached summary for ${companyName}`);
+      // summary cached
     }
 
     return summary;
@@ -190,7 +190,6 @@ export async function GET(request: NextRequest) {
   const responseCacheKey = buildResponseCacheKey(queryKo, queryEn, context ?? undefined);
   const cachedResponse = await getCached<{ answer: string | null; articles: RssArticle[] }>(responseCacheKey);
   if (cachedResponse) {
-    console.log(`[News] Full response cache hit for "${queryKo}"`);
     return NextResponse.json({ success: true, ...cachedResponse });
   }
 
@@ -210,8 +209,6 @@ export async function GET(request: NextRequest) {
 
     // Cache full response for 24 hours (1 fetch per day per query)
     await setCache(responseCacheKey, { answer, articles });
-    console.log(`[News] Cached full response for "${queryKo}"`);
-
     return NextResponse.json({ success: true, answer, articles });
   } catch (err) {
     console.error('News fetch error:', err);
