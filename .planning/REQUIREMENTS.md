@@ -8,8 +8,8 @@
 ### Foundation (기반 수정)
 
 - [ ] **FOUN-01**: SQLite 싱글턴 커넥션 패턴 적용 — getSqliteDb()를 모듈 레벨 싱글턴으로 변경, 모든 query 함수에서 db.close() 제거
-- [ ] **FOUN-02**: Next.js App Router error.tsx 추가 — src/app/error.tsx, global-error.tsx 생성으로 페이지 레벨 에러 포착
-- [ ] **FOUN-03**: 차트 컴포넌트 에러 바운더리 래핑 — Recharts 렌더링 에러가 전체 앱을 크래시하지 않도록 개별 차트 보호
+- [x] **FOUN-02**: Next.js App Router error.tsx 추가 — src/app/error.tsx, global-error.tsx 생성으로 페이지 레벨 에러 포착
+- [x] **FOUN-03**: 차트 컴포넌트 에러 바운더리 래핑 — Recharts 렌더링 에러가 전체 앱을 크래시하지 않도록 개별 차트 보호
 - [ ] **FOUN-04**: postinstall 훅 제거 — npm install 시 자동 seed 실행 제거, npm run seed를 명시적 수동 실행으로 변경
 - [ ] **FOUN-05**: mock 데이터 파일 정리 — src/data/*-mock.ts (~2400줄) 사용 여부 확인 후 제거 또는 테스트 픽스처로 이동
 - [ ] **FOUN-06**: devDependencies 분류 수정 — @types/*, eslint 관련 패키지를 dependencies에서 devDependencies로 이동
@@ -80,8 +80,8 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | FOUN-01 | Phase 1 | Pending |
-| FOUN-02 | Phase 1 | Pending |
-| FOUN-03 | Phase 1 | Pending |
+| FOUN-02 | Phase 1 | Complete |
+| FOUN-03 | Phase 1 | Complete |
 | FOUN-04 | Phase 1 | Pending |
 | FOUN-05 | Phase 1 | Pending |
 | FOUN-06 | Phase 1 | Pending |

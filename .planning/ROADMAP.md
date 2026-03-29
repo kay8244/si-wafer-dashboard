@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [ ] 01-01-PLAN.md — SQLite singleton fix, postinstall removal, devDependencies reclassification
-- [ ] 01-02-PLAN.md — Error boundaries (error.tsx, global-error.tsx, ChartErrorBoundary + 12 chart wrapping)
+- [x] 01-02-PLAN.md — Error boundaries (error.tsx, global-error.tsx, ChartErrorBoundary + 12 chart wrapping)
 - [ ] 01-03-PLAN.md — Mock data relocation from src/data/ to tests/fixtures/
 
 ### Phase 2: Core Quality
