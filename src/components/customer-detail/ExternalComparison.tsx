@@ -168,6 +168,26 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
     return labels;
   }, [filteredData]);
 
+  // AI analysis state (must be before any early return to satisfy React rules of hooks)
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const aiLoadingRef = useRef(false);
+  const prevCustomerRef = useRef(customerId);
+
+  // Auto-refetch when customer or metric toggles change while panel is open
+  const prevCustomerRef2 = useRef(customerId);
+  const prevMetricsRef = useRef([...visibleMetrics].join(','));
+  useEffect(() => {
+    const metricsKey = [...visibleMetrics].join(',');
+    if (aiOpen && (customerId !== prevCustomerRef2.current || metricsKey !== prevMetricsRef.current)) {
+      setAiInsight(null);
+      fetchAiInsight();
+    }
+    prevCustomerRef2.current = customerId;
+    prevMetricsRef.current = metricsKey;
+  }, [customerId, visibleMetrics, aiOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Foundry customers: show industry metrics instead of wafer in/out placeholder
   if (customerType === 'foundry') {
     if (industryMetrics && industryMetrics.length > 0) {
@@ -505,26 +525,6 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
   const tooltipStyle = isDark
     ? { fontSize: 11, borderRadius: 6, backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' }
     : { fontSize: 11, borderRadius: 6 };
-
-  // AI analysis state
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
-  const aiLoadingRef = useRef(false);
-  const prevCustomerRef = useRef(customerId);
-
-  // Auto-refetch when customer or metric toggles change while panel is open
-  const prevCustomerRef2 = useRef(customerId);
-  const prevMetricsRef = useRef([...visibleMetrics].join(','));
-  useEffect(() => {
-    const metricsKey = [...visibleMetrics].join(',');
-    if (aiOpen && (customerId !== prevCustomerRef2.current || metricsKey !== prevMetricsRef.current)) {
-      setAiInsight(null);
-      fetchAiInsight();
-    }
-    prevCustomerRef2.current = customerId;
-    prevMetricsRef.current = metricsKey;
-  }, [customerId, visibleMetrics, aiOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchAiInsight = async () => {
     if (aiOpen && aiInsight && !aiLoadingRef.current) { setAiOpen(false); return; }
