@@ -33,9 +33,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — SQLite singleton fix, postinstall removal, devDependencies reclassification
+- [x] 01-01-PLAN.md — SQLite singleton fix, postinstall removal, devDependencies reclassification
 - [x] 01-02-PLAN.md — Error boundaries (error.tsx, global-error.tsx, ChartErrorBoundary + 12 chart wrapping)
-- [ ] 01-03-PLAN.md — Mock data relocation from src/data/ to tests/fixtures/
+- [x] 01-03-PLAN.md — Mock data relocation from src/data/ to tests/fixtures/
 
 ### Phase 2: Core Quality
 **Goal**: AI Insight 페칭 중복을 단일 훅으로 통합하고, API 엔드포인트에 입력 검증과 Rate Limiting을 추가하여 코드 품질과 보안을 개선한다
