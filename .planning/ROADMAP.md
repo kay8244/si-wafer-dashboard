@@ -47,7 +47,13 @@ Plans:
   3. `/api/ai-insight`, `/api/transcript`, `/api/news`에 잘못된 형식의 요청을 보내면 Zod 스키마 검증 에러로 400 응답이 반환된다
   4. 동일 IP에서 짧은 시간 내 반복 요청 시 Rate Limiting에 의해 429 응답이 반환된다
   5. `catch` 블록이 silent fail하지 않고 구조화된 `console.error`로 에러 정보를 출력한다
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — useAiInsight hook + AiInsightPanel component extraction, 3 component migration
+- [ ] 02-02-PLAN.md — Silent catch block error logging + SupplyChainPage eslint-disable fix
+- [ ] 02-03-PLAN.md — Zod v4 installation + API route input validation
+- [ ] 02-04-PLAN.md — proxy.ts with Basic Auth + Rate Limiting
 
 ### Phase 3: Readability — God Component Decomposition
 **Goal**: 1000줄 이상의 God Component를 로직 훅, 서브 컴포넌트, 얇은 컨테이너의 3계층으로 분해하여 각 파일이 단일 책임을 갖도록 한다
@@ -90,8 +96,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation Fixes | 0/3 | Planned | - |
-| 2. Core Quality | 0/TBD | Not started | - |
+| 1. Foundation Fixes | 3/3 | Complete | 2026-03-29 |
+| 2. Core Quality | 0/4 | Planned | - |
 | 3. Readability — God Component Decomposition | 0/TBD | Not started | - |
 | 4. Tests + Developer UX | 0/TBD | Not started | - |
 | 5. Regression Validation | 0/TBD | Not started | - |
