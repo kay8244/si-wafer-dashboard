@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import type { EstimateTrendData } from '@/types/indicators';
 import { useDarkMode } from '@/hooks/useDarkMode';
+import ChartErrorBoundary from '@/components/ChartErrorBoundary';
 
 interface Props {
   data: EstimateTrendData;
@@ -142,6 +143,7 @@ export default function EstimateTrendChart({ data, customerId }: Props) {
       </div>
 
       <div style={{ height: 220 }}>
+        <ChartErrorBoundary chartName="EstimateTrendChart">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData} margin={{ top: 10, right: 4, left: 12, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
@@ -235,6 +237,7 @@ export default function EstimateTrendChart({ data, customerId }: Props) {
             )}
           </ComposedChart>
         </ResponsiveContainer>
+        </ChartErrorBoundary>
       </div>
 
       {/* Legend */}

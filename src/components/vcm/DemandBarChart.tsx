@@ -14,6 +14,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { useDarkMode } from '@/hooks/useDarkMode';
+import ChartErrorBoundary from '@/components/ChartErrorBoundary';
 import type { YearlyValue } from '@/types/indicators';
 
 interface DataPoint {
@@ -318,6 +319,7 @@ ${analysisRequest}
         {hasWaferLine && <span className="text-[8px] text-gray-700 dark:text-gray-300 font-medium">Wafer 수요(K장)</span>}
       </div>
       <div style={{ height: 320 }}>
+        <ChartErrorBoundary chartName="DemandBarChart">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData} margin={{ top: 20, right: 8, left: 0, bottom: 4 }}>
             <XAxis
@@ -438,6 +440,7 @@ ${analysisRequest}
             )}
           </ComposedChart>
         </ResponsiveContainer>
+        </ChartErrorBoundary>
       </div>
 
       {/* Data table — yearly */}

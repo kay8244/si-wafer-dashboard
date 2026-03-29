@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
+import ChartErrorBoundary from '@/components/ChartErrorBoundary';
 import {
   ComposedChart,
   LineChart,
@@ -241,6 +242,7 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
               </div>
             </div>
             <div style={{ height: 80 }} className="mt-1">
+              <ChartErrorBoundary chartName="ExternalComparison-line">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
                   <XAxis dataKey="date" tick={{ fontSize: 8, fill: '#9ca3af' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
@@ -249,6 +251,7 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
                   <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={1.5} dot={{ r: 2, fill: '#3b82f6' }} />
                 </LineChart>
               </ResponsiveContainer>
+              </ChartErrorBoundary>
             </div>
             {/* Data table */}
             {chartData.length > 0 && (
@@ -351,6 +354,7 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
               <span className="text-[7px] text-emerald-500">수량({pair.volume.unit})</span>
             </div>
             <div style={{ height: 90 }}>
+              <ChartErrorBoundary chartName="ExternalComparison-composed1">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={combined} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
                   <XAxis dataKey="date" tick={{ fontSize: 8, fill: '#9ca3af' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
@@ -368,6 +372,7 @@ export default function ExternalComparison({ data, waferInOutData, bitGrowthData
                   <Line yAxisId="right" type="monotone" dataKey="volume" stroke="#10b981" strokeWidth={1.5} dot={{ r: 2, fill: '#10b981' }} />
                 </ComposedChart>
               </ResponsiveContainer>
+              </ChartErrorBoundary>
             </div>
             {/* Data table */}
             {combined.length > 0 && (
@@ -725,6 +730,7 @@ ${analysisParts.join('\n')}
 
       {/* Combined Chart */}
       <div style={{ height: 200 }}>
+        <ChartErrorBoundary chartName="ExternalComparison-composed2">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={filteredData} margin={{ top: 20, right: 4, left: 12, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
@@ -945,6 +951,7 @@ ${analysisParts.join('\n')}
             )}
           </ComposedChart>
         </ResponsiveContainer>
+        </ChartErrorBoundary>
       </div>
 
       {/* Legend */}

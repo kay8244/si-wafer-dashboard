@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 import type { MonthlyMetricData } from '@/types/indicators';
 import { useDarkMode } from '@/hooks/useDarkMode';
+import ChartErrorBoundary from '@/components/ChartErrorBoundary';
 
 export type MetricKey = 'waferInput' | 'purchaseVolume' | 'inventoryMonths' | 'capa' | 'utilization';
 
@@ -425,6 +426,7 @@ export default function MonthlyMetricsChart({
         )}
       </div>
 
+      <ChartErrorBoundary chartName="MonthlyMetricsChart">
       <ResponsiveContainer width="100%" height={240}>
         <ComposedChart data={chartData} margin={{ top: 20, right: 8, bottom: 0, left: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
@@ -591,6 +593,7 @@ export default function MonthlyMetricsChart({
           ))}
         </ComposedChart>
       </ResponsiveContainer>
+      </ChartErrorBoundary>
 
       {selectedMetrics.includes('utilization') && (
         <p className="mt-1 text-[10px] text-gray-400 dark:text-gray-500">

@@ -24,6 +24,7 @@ import {
   type TimeRange,
 } from '@/lib/chart-utils';
 import CorrelationBadges from '@/components/supply-chain/CorrelationBadges';
+import ChartErrorBoundary from '@/components/ChartErrorBoundary';
 
 const TABLE_MONTHS = 12;
 
@@ -254,6 +255,7 @@ export default function MemoryPriceIndicators({ indicators: indicatorData, overl
           </div>
           <div className="relative">
           <CorrelationBadges correlations={correlations} isDark={isDark} />
+          <ChartErrorBoundary chartName="MemoryPriceIndicators">
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
@@ -319,6 +321,7 @@ export default function MemoryPriceIndicators({ indicators: indicatorData, overl
               ))}
             </LineChart>
           </ResponsiveContainer>
+          </ChartErrorBoundary>
           </div>
         </div>
       )}

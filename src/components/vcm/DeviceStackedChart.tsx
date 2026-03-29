@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import type { DeviceStackedYearlyEntry, DeviceFilterItem } from '@/types/indicators';
 import { useDarkMode } from '@/hooks/useDarkMode';
+import ChartErrorBoundary from '@/components/ChartErrorBoundary';
 const START_YEAR = 2024;
 const END_YEAR = 2030;
 
@@ -129,6 +130,7 @@ export default function DeviceStackedChart({ title, data, deviceFilters }: Devic
       </div>
 
       <div style={{ height: 200 }}>
+        <ChartErrorBoundary chartName="DeviceStackedChart">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={filteredData} margin={{ top: 20, right: 8, left: 8, bottom: 4 }}>
             <XAxis
@@ -232,6 +234,7 @@ export default function DeviceStackedChart({ title, data, deviceFilters }: Devic
             ))}
           </BarChart>
         </ResponsiveContainer>
+        </ChartErrorBoundary>
       </div>
 
       {/* Data table — yearly */}

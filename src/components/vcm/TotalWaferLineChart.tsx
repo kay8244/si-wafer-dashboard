@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import type { TotalWaferYearlyEntry } from '@/types/indicators';
 import { useDarkMode } from '@/hooks/useDarkMode';
+import ChartErrorBoundary from '@/components/ChartErrorBoundary';
 
 const START_YEAR = 2024;
 const END_YEAR = 2030;
@@ -212,6 +213,7 @@ export default function TotalWaferLineChart({ data, internalData = [] }: Props) 
 
       {/* Chart — Line (market) + Bar (internal) */}
       <div style={{ height: 240 }}>
+        <ChartErrorBoundary chartName="TotalWaferLineChart">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 28, right: 16, left: 8, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
@@ -274,6 +276,7 @@ export default function TotalWaferLineChart({ data, internalData = [] }: Props) 
             )}
           </BarChart>
         </ResponsiveContainer>
+        </ChartErrorBoundary>
       </div>
 
       {/* Data table — grouped by metric: 전체 > EPI > PW */}

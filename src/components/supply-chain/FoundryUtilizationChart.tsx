@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import type { FoundryCompanyId, FoundryNode } from '@/types/indicators';
 import { useDarkMode } from '@/hooks/useDarkMode';
+import ChartErrorBoundary from '@/components/ChartErrorBoundary';
 
 type QuarterRange = 4 | 8 | 12;
 
@@ -329,6 +330,7 @@ export default function FoundryUtilizationChart({ foundryNodes, foundryNodeColor
           노드를 선택해주세요
         </div>
       ) : (
+        <ChartErrorBoundary chartName="FoundryUtilizationChart">
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
@@ -388,6 +390,7 @@ export default function FoundryUtilizationChart({ foundryNodes, foundryNodeColor
             )}
           </LineChart>
         </ResponsiveContainer>
+        </ChartErrorBoundary>
       )}
 
       {/* Data Table — rows=metrics, cols=months */}

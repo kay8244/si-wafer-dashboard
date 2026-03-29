@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import type { CustomerExecutive, IndustryMetric } from '@/types/indicators';
 import { useDarkMode } from '@/hooks/useDarkMode';
+import ChartErrorBoundary from '@/components/ChartErrorBoundary';
 
 interface Props {
   metrics: CustomerExecutive['industryMetrics'];
@@ -72,6 +73,7 @@ function MetricCard({ metric, wide, isDark }: { metric: IndustryMetric; wide: bo
 
       {/* Mini chart */}
       <div style={{ height: 60 }}>
+        <ChartErrorBoundary chartName="IndustryMetricsPanel">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
             <Tooltip
@@ -97,6 +99,7 @@ function MetricCard({ metric, wide, isDark }: { metric: IndustryMetric; wide: bo
             />
           </LineChart>
         </ResponsiveContainer>
+        </ChartErrorBoundary>
       </div>
     </div>
   );

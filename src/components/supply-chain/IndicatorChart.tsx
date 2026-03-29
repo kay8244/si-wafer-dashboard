@@ -16,6 +16,7 @@ import { SupplyChainCategory, ViewMode, LeadingIndicatorRating } from '@/types/i
 import { useDarkMode } from '@/hooks/useDarkMode';
 import { OverlayLine, pearsonCorrelation, tightDomain, Correlation } from '@/lib/chart-utils';
 import CorrelationBadges from '@/components/supply-chain/CorrelationBadges';
+import ChartErrorBoundary from '@/components/ChartErrorBoundary';
 
 type TimeRange = 6 | 12 | 24 | 36;
 const TIME_RANGES: TimeRange[] = [6, 12, 24, 36];
@@ -325,6 +326,7 @@ export default function IndicatorChart({
           {/* Correlation badges */}
           <CorrelationBadges correlations={correlations} isDark={isDark} />
 
+          <ChartErrorBoundary chartName="IndicatorChart">
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
@@ -425,6 +427,7 @@ export default function IndicatorChart({
               ))}
             </LineChart>
           </ResponsiveContainer>
+          </ChartErrorBoundary>
         </div>
         {AiResult}
       </div>
@@ -480,6 +483,7 @@ export default function IndicatorChart({
         </p>
         {TimeRangeSelector}
       </div>
+      <ChartErrorBoundary chartName="IndicatorChart">
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={chartData} margin={{ top: 20, right: hasOverlay ? 30 : 16, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
@@ -550,6 +554,7 @@ export default function IndicatorChart({
           ))}
         </LineChart>
       </ResponsiveContainer>
+      </ChartErrorBoundary>
     </div>
   );
 }
