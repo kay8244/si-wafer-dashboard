@@ -130,9 +130,9 @@ a# Project Rules
 - Environment variables configured in Vercel dashboard
 - No `vercel.json` present (uses defaults)
 ## Data Layer
-- `src/data/supply-chain-mock.ts` (481 lines)
-- `src/data/customer-detail-mock.ts` (773 lines)
-- `src/data/vcm-mock.ts` (1189 lines)
+- `tests/fixtures/supply-chain-mock.ts` (481 lines)
+- `tests/fixtures/customer-detail-mock.ts` (773 lines)
+- `tests/fixtures/vcm-mock.ts` (1189 lines)
 - `customer-detail-monthly.csv`
 - `foundry-nodes.csv`
 - `memory-price.csv`
@@ -151,7 +151,7 @@ a# Project Rules
 - Library utilities: kebab-case `.ts` files: `chart-utils.ts`, `data-generation.ts`, `news-utils.tsx`
 - API routes: Next.js App Router convention `route.ts` inside directory-named folders: `src/app/api/customer-detail/route.ts`
 - Type definition files: kebab-case: `src/types/indicators.ts`
-- Mock data files: kebab-case with `-mock` suffix: `src/data/customer-detail-mock.ts`
+- Mock data files: kebab-case with `-mock` suffix: `tests/fixtures/customer-detail-mock.ts`
 - Use camelCase for all functions: `formatCurrency`, `pearsonCorrelation`, `buildCustomerExecutive`
 - Component functions use PascalCase and are always `export default function ComponentName`: never arrow function exports for components
 - Utility/helper functions are named exports (non-default): `export function formatCurrency(...)`
@@ -291,9 +291,9 @@ a# Project Rules
 - Used by: `src/app/api/news/route.ts`, `src/app/api/ai-insight/route.ts`, `src/app/api/transcript/route.ts`
 - Purpose: Populate the database from mock data or external sources
 - Location: `scripts/seed.ts`, `scripts/seed-postgres.ts`
-- Contains: Seed scripts that read from `src/data/*-mock.ts` and insert into the metrics table
+- Contains: Seed scripts that read from `tests/fixtures/*-mock.ts` and insert into the metrics table
 - Depends on: `src/lib/db.ts`, mock data files
-- Triggered by: `npm run seed` (also runs as `postinstall`)
+- Triggered by: `npm run seed` (manual execution)
 ## Data Flow
 - No global state management library (no Redux, Zustand, Jotai, etc.)
 - Each page-level component manages its own state via `useState`
@@ -321,8 +321,8 @@ a# Project Rules
 - Triggers: Client-side `fetch()` calls from hooks
 - Endpoints:
 - Location: `scripts/seed.ts` (SQLite), `scripts/seed-postgres.ts` (Postgres)
-- Triggers: `npm run seed`, `npm run seed:pg`, or `postinstall`
-- Responsibilities: Reads mock data from `src/data/*-mock.ts`, inserts into `metrics` table
+- Triggers: `npm run seed`, `npm run seed:pg`
+- Responsibilities: Reads mock data from `tests/fixtures/*-mock.ts`, inserts into `metrics` table
 ## Error Handling
 - All route handlers wrap their logic in `try/catch`
 - On error: log to `console.error`, return `NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })`

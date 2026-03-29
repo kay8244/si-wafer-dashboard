@@ -1041,7 +1041,7 @@ sqlite3 data/dashboard.db < data/supply-chain-real.sql
 
 ### 방법 C: seed 스크립트 활용
 
-`src/data/supply-chain-mock.ts`의 mock 값을 실데이터로 교체한 뒤:
+`tests/fixtures/supply-chain-mock.ts`의 mock 값을 실데이터로 교체한 뒤:
 
 ```bash
 npm run seed                          # SQLite 전체 재생성
