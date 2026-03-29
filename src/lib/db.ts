@@ -39,13 +39,19 @@ export function isPostgres(): boolean {
 
 let _seedDb: import('better-sqlite3').Database | null = null;
 
+const globalForDb = globalThis as typeof globalThis & {
+  _sqliteDb?: import('better-sqlite3').Database;
+};
+
 function getSqliteDb(): import('better-sqlite3').Database {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Database = require('better-sqlite3') as typeof import('better-sqlite3');
-  // Compute path at call time (not module load time) to avoid Turbopack caching issues
-  const dbPath = require('path').join(process.cwd(), 'data', 'dashboard.db');
-  const db = new Database(dbPath);
-  return db;
+  if (!globalForDb._sqliteDb) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3') as typeof import('better-sqlite3');
+    const dbPath = require('path').join(process.cwd(), 'data', 'dashboard.db');
+    globalForDb._sqliteDb = new Database(dbPath);
+    globalForDb._sqliteDb.pragma('journal_mode = WAL');
+  }
+  return globalForDb._sqliteDb;
 }
 
 /** Ensure table+indexes exist (called by seed scripts only) */
@@ -127,11 +133,9 @@ export async function queryAll(tab: string): Promise<MetricRow[]> {
   const db = getSqliteDb();
   try {
     const rows = db.prepare('SELECT * FROM metrics WHERE tab = ? ORDER BY id ASC').all(tab) as MetricRow[];
-    db.close();
     return rows;
   } catch (err) {
     console.warn('[db] queryAll failed:', err);
-    db.close();
     return [];
   }
 }
