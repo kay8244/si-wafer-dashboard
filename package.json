@@ -11,19 +11,13 @@
     "seed:pg": "npx tsx scripts/seed-postgres.ts",
     "validate": "npx tsx scripts/validate.ts",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "postinstall": "npx tsx scripts/seed.ts"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
     "@tailwindcss/postcss": "^4.1.18",
-    "@types/node": "^25.2.3",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
     "@vercel/postgres": "^0.10.0",
     "better-sqlite3": "^12.8.0",
-    "eslint": "^9.39.2",
-    "eslint-config-next": "^16.1.6",
     "next": "^16.1.6",
     "postcss": "^8.5.6",
     "react": "^19.2.4",
@@ -34,8 +28,13 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.2.3",
     "@types/pg": "^8.18.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "dotenv": "^17.3.1",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.6",
     "pg": "^8.20.0",
     "tsx": "^4.21.0",
     "vitest": "^4.1.1"
