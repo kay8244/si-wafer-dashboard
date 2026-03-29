@@ -79,39 +79,39 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUN-01 | — | Pending |
-| FOUN-02 | — | Pending |
-| FOUN-03 | — | Pending |
-| FOUN-04 | — | Pending |
-| FOUN-05 | — | Pending |
-| FOUN-06 | — | Pending |
-| QUAL-01 | — | Pending |
-| QUAL-02 | — | Pending |
-| QUAL-03 | — | Pending |
-| QUAL-04 | — | Pending |
-| QUAL-05 | — | Pending |
-| QUAL-06 | — | Pending |
-| QUAL-07 | — | Pending |
-| READ-01 | — | Pending |
-| READ-02 | — | Pending |
-| READ-03 | — | Pending |
-| READ-04 | — | Pending |
-| READ-05 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| DEVX-01 | — | Pending |
-| DEVX-02 | — | Pending |
-| DEVX-03 | — | Pending |
-| REGR-01 | — | Pending |
-| REGR-02 | — | Pending |
-| REGR-03 | — | Pending |
+| FOUN-01 | Phase 1 | Pending |
+| FOUN-02 | Phase 1 | Pending |
+| FOUN-03 | Phase 1 | Pending |
+| FOUN-04 | Phase 1 | Pending |
+| FOUN-05 | Phase 1 | Pending |
+| FOUN-06 | Phase 1 | Pending |
+| QUAL-01 | Phase 2 | Pending |
+| QUAL-02 | Phase 2 | Pending |
+| QUAL-03 | Phase 2 | Pending |
+| QUAL-04 | Phase 2 | Pending |
+| QUAL-05 | Phase 2 | Pending |
+| QUAL-06 | Phase 2 | Pending |
+| QUAL-07 | Phase 2 | Pending |
+| READ-01 | Phase 3 | Pending |
+| READ-02 | Phase 3 | Pending |
+| READ-03 | Phase 3 | Pending |
+| READ-04 | Phase 3 | Pending |
+| READ-05 | Phase 3 | Pending |
+| TEST-01 | Phase 4 | Pending |
+| TEST-02 | Phase 4 | Pending |
+| TEST-03 | Phase 4 | Pending |
+| DEVX-01 | Phase 4 | Pending |
+| DEVX-02 | Phase 4 | Pending |
+| DEVX-03 | Phase 4 | Pending |
+| REGR-01 | Phase 5 | Pending |
+| REGR-02 | Phase 5 | Pending |
+| REGR-03 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 27 total
-- Mapped to phases: 0
-- Unmapped: 27 ⚠️
+- Mapped to phases: 27
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-29*
-*Last updated: 2026-03-29 after initial definition*
+*Last updated: 2026-03-29 — traceability complete after roadmap creation*
