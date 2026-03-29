@@ -11,7 +11,7 @@ import {
   OVERLAY_COLORS,
   FOUNDRY_NODES,
   FOUNDRY_NODE_COLORS,
-} from '../src/data/supply-chain-mock';
+} from '../tests/fixtures/supply-chain-mock';
 import { seededValue as seededVal, getRecentMonths } from '../src/lib/data-generation';
 import {
   VCM_DATA,
@@ -25,8 +25,8 @@ import {
   DEVICE_STACKED_YEARLY_BY_APP,
   TOTAL_WAFER_DEMAND_BY_APP,
   YEARLY_MOUNT_PER_UNIT_BY_CATEGORY,
-} from '../src/data/vcm-mock';
-import { CUSTOMER_LIST, CUSTOMER_EXECUTIVES } from '../src/data/customer-detail-mock';
+} from '../tests/fixtures/vcm-mock';
+import { CUSTOMER_LIST, CUSTOMER_EXECUTIVES } from '../tests/fixtures/customer-detail-mock';
 
 const POSTGRES_URL = process.env.POSTGRES_URL || process.env.DATABASE_URL;
 if (!POSTGRES_URL) {
