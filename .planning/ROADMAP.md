@@ -30,7 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. 차트 컴포넌트 렌더링 에러 발생 시 전체 앱이 흰 화면이 되지 않고 에러 경계 UI가 표시된다
   4. `src/data/*-mock.ts` 파일이 삭제되거나 테스트 픽스처로 이동되어 프로덕션 번들에서 제거된다
   5. `npm run build`가 성공하고 `@types/*`, `eslint` 관련 패키지가 devDependencies에 올바르게 분류된다
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — SQLite singleton fix, postinstall removal, devDependencies reclassification
+- [ ] 01-02-PLAN.md — Error boundaries (error.tsx, global-error.tsx, ChartErrorBoundary + 12 chart wrapping)
+- [ ] 01-03-PLAN.md — Mock data relocation from src/data/ to tests/fixtures/
 
 ### Phase 2: Core Quality
 **Goal**: AI Insight 페칭 중복을 단일 훅으로 통합하고, API 엔드포인트에 입력 검증과 Rate Limiting을 추가하여 코드 품질과 보안을 개선한다
@@ -85,7 +90,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation Fixes | 0/TBD | Not started | - |
+| 1. Foundation Fixes | 0/3 | Planned | - |
 | 2. Core Quality | 0/TBD | Not started | - |
 | 3. Readability — God Component Decomposition | 0/TBD | Not started | - |
 | 4. Tests + Developer UX | 0/TBD | Not started | - |
